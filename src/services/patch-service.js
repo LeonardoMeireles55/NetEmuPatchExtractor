@@ -62,7 +62,7 @@ class PatchService {
   }
 
   static processFile(inputFileName, outputFileName, originalname) {
-    const outputFilePath = path.resolve(__dirname, '../../public/statics/output', outputFileName);
+    const outputFilePath = path.resolve(__dirname, '/tmp/', outputFileName);
 
     fs.readFile(inputFileName, (err, data) => {
       if (err) {
@@ -120,7 +120,7 @@ class PatchService {
     return outputFilePath;
   }
  static deleteOldFiles() {
-    const outputDirectory = path.resolve(__dirname, '../../public/statics/output');
+    const outputDirectory = path.resolve(__dirname, '/tmp');
     fs.readdir(outputDirectory, (err, files) => {
       if (err) {
         logger.error("Error reading the output directory:", err.message);

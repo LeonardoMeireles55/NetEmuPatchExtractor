@@ -9,7 +9,7 @@ const PatchController = require('./src/controllers/patch-controller');
 const app = express();
 const port = 3000;
 
-const upload = multer({ dest: 'public/statics/input/uploads' });
+const upload = multer({ dest: '/tmp' });
 
 app.use(express.json());
 app.use(cors());
