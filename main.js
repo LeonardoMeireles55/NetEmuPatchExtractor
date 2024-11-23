@@ -13,7 +13,7 @@ const port = 3000;
 const upload = multer({ dest: 'public/statics/input/uploads' });
 
 app.use(express.json());
-app.use(cors());
+// app.use(cors());
 
 app.use('/output', express.static(path.join(__dirname, 'public/output')));
 app.use(express.static(path.join(__dirname, 'public')));
