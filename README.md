@@ -72,7 +72,7 @@ patch-extractor/
 ├── public/                # Static files (HTML, CSS, JS)
 │   ├── index.html        # Main web interface
 │   ├── styles.css        # Styling
-│   └── scripts.js        # Frontend logic
+│   └── script.js        # Frontend logic
 ├── src/
 │   ├── controllers/
 │   │   └── patch-controller.js    # API controller
