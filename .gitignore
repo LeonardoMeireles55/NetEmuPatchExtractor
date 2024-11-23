@@ -1,14 +1,11 @@
 # Node.js
 node_modules/
 
-# Dependências do NPM
 package-lock.json
 
-# Diretórios temporários de build
 dist/
 build/
 
-# Arquivos gerados
 *.log
 *.env
 *.bak
@@ -16,21 +13,15 @@ build/
 *.config
 *.CONFIG
 
-# Pasta de uploads temporários
-src/public/statics/input/*
-src/public/statics/output/*
+public/statics/input/
+public/statics/output/
 
-
-# Arquivos de configuração do editor
 .vscode/
 .idea/
 
-# Sistema operacional
 .DS_Store
 Thumbs.db
 
-# Arquivos específicos de IDEs
 *.iml
 
-# Arquivos específicos de ambientes de contêineres
 *.dockerignore
