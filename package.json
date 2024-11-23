@@ -11,7 +11,9 @@
       "convert": "node main.js --convert",
       "lint": "eslint src --ext .js",
       "lint:fix": "eslint src --ext .js --fix",
-      "validate": "npm run lint"
+      "validate": "npm run lint",
+      "build": "echo 'No build step necessary for this project' && exit 0",  
+      "vercel-build": "echo 'Vercel build step' && exit 0"  
     },
     "keywords": [
       "patch",
