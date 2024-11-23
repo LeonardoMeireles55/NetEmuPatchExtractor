@@ -13,8 +13,8 @@ build/
 *.config
 *.CONFIG
 
-public/statics/input/
-public/statics/output/
+public/statics/input/*
+public/statics/output/*
 
 .vscode/
 .idea/
