@@ -1,16 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
-const logger = new SimpleLogger('./log-file.log');
+const logger = new SimpleLogger('tmp/log-file.log');
 
 class PatchService {
-
-  static fileMap = new Map();
-
-  static getfileMap() {
-    return this.fileMap;
-  }
-
+  
   static findCommandLocalization(data) {
     const locations = [];
     logger.log("Searching for byte 0x0A in the binary file...");

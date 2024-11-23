@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const cron = require('node-cron');
-const PatchService = require('./src/services/patch-service');
 
 const PatchController = require('./src/controllers/patch-controller');
 
