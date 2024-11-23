@@ -4,6 +4,33 @@ const PatchService = require('../services/patch-service');
 
 const PatchController = {
 
+  async getFileFromTmp(req, res) {
+    const fileName = req.params.fileName;  // Recebe o nome do arquivo a partir do parâmetro da URL
+
+    if (!fileName) {
+      return res.status(400).json({ error: 'File name not provided' });
+    }
+
+    const tmpFilePath = path.join('/tmp', fileName); // Caminho completo do arquivo no diretório tmp
+    try {
+      // Verifica se o arquivo existe
+      if (!fs.existsSync(tmpFilePath)) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      // Envia o arquivo para o cliente
+      res.download(tmpFilePath, fileName, (err) => {
+        if (err) {
+          console.error('Erro ao enviar o arquivo:', err);
+          return res.status(500).json({ error: 'Error sending file' });
+        }
+      });
+    } catch (err) {
+      console.error('Erro ao ler o arquivo:', err);
+      return res.status(500).json({ error: 'Error reading the file' });
+    }
+  },
+
   async processHexFile(req, res) {
     if (!req.file) {
       return res.status(400).json({ error: 'Hex file is required' });
@@ -17,19 +44,11 @@ const PatchController = {
     console.log(`Processing hex file: ${originalName}`);
 
     try {
-      PatchService.processFile(filePath, outputFileName, originalName);
-
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          console.error('Error:', err);
-        } else {
-          console.log('Sucess deleting file:', filePath);
-        }
-      });
+      const data = PatchService.processFile(filePath, outputFileName, originalName);
 
       return res.status(200).json({
         message: 'Hex file processing completed.',
-        downloadLink: `/statics/output/${outputFileName}`
+        downloadLink: `/download/${outputFileName}`
       });
       
     } catch (error) {

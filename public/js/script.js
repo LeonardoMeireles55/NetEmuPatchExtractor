@@ -33,10 +33,11 @@ document.getElementById('fileForm').addEventListener('submit', async function(ev
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
+        // Handle the JSON response
+        const data = await response.json(); // Parse the response body as JSON
 
         if (data.error) {
-            throw new Error(data.error);
+            throw new Error(data.error); // Check if there's an error in the response
         }
 
         // Update UI with success state

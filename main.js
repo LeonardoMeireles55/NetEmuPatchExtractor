@@ -21,7 +21,20 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/download', (req, res)  => PatchController.getDownloadAndEraseFile(req, res));
+async function getFileFromTmp(fileName) {
+  const tmpFilePath = path.join('/tmp', fileName);
+  try {
+      const fileData = await fs.promises.readFile(tmpFilePath);
+      console.log(`Arquivo lido de: ${tmpFilePath}`);
+      return fileData;
+  } catch (err) {
+      console.error('Erro ao ler o arquivo:', err);
+      throw err;
+  }
+}
+
+app.get('/download/:fileName', (req, res) => PatchController.getFileFromTmp(req, res));
+
 
 app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
 
