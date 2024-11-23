@@ -1,0 +1,45 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <!-- Background Circle -->
+    <circle cx="256" cy="256" r="256" fill="#4F46E5"/>
+    
+    <!-- Hexagonal Pattern Background -->
+    <path d="M128 150L178 120L228 150L228 210L178 240L128 210Z" 
+          fill="#ffffff" fill-opacity="0.1"/>
+    <path d="M238 150L288 120L338 150L338 210L288 240L238 210Z" 
+          fill="#ffffff" fill-opacity="0.1"/>
+    <path d="M183 240L233 210L283 240L283 300L233 330L183 300Z" 
+          fill="#ffffff" fill-opacity="0.1"/>
+          
+    <!-- Main Icon Elements -->
+    <g transform="translate(106,106) scale(0.6)">
+        <!-- PS2-style Rectangle -->
+        <rect x="150" y="140" width="200" height="120" rx="10" 
+              fill="#ffffff"/>
+        
+        <!-- Binary/Hex Stream -->
+        <text x="170" y="190" font-family="monospace" font-size="24" 
+              fill="#4F46E5" font-weight="bold">0x0A</text>
+        <text x="240" y="190" font-family="monospace" font-size="24" 
+              fill="#4F46E5" font-weight="bold">...</text>
+        
+        <!-- Arrow indicating extraction -->
+        <path d="M200 220 L300 220 L280 200 M300 220 L280 240" 
+              stroke="#4F46E5" stroke-width="8" fill="none"/>
+    </g>
+    
+    <!-- Embellishments -->
+    <circle cx="256" cy="256" r="240" 
+            stroke="#ffffff" stroke-width="2" 
+            fill="none" stroke-opacity="0.3"/>
+    
+    <!-- Bottom Text -->
+    <text x="256" y="380" 
+          text-anchor="middle" 
+          font-family="Arial, sans-serif" 
+          font-size="40" 
+          font-weight="bold" 
+          fill="#ffffff">
+        PE
+    </text>
+</svg>

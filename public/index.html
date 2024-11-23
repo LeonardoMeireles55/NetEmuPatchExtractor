@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patch Extractor</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+</head>
+
+<body>
+    <div class="container">
+        <h1>PS2 net_emu -> Patch Extractor</h1>
+
+        <form id="fileForm">
+            <div class="input-group">
+                <label for="fileInput">Select binary file:</label>
+                <input type="file" id="fileInput" name="file" required>
+            </div>
+            <button type="submit" class="btn">Extract Patches</button>
+        </form>
+
+        <div id="logs" class="section">
+            <h3>Logs:</h3>
+            <pre id="logOutput">Waiting for action...</pre>
+        </div>
+
+        <div id="downloadSection" class="section hidden">
+            <h3>Generated File:</h3>
+            <a id="downloadLink" href="#" download>Download patch file</a>
+        </div>
+    </div>
+
+    <script src="/js/script.js"></script>
+</body>
+
+</html>

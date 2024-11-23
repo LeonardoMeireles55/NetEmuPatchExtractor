@@ -1,0 +1,29 @@
+{
+    "name": "ps2-netemu-patch-extractor",
+    "version": "0.0.1",
+    "description": "A tool for extracting and converting patches with the 0x0A command from PS2 NetEmu binary files.",
+    "main": "main.js",
+    "scripts": {
+        "start": "node main.js",
+        "lint": "eslint src",
+        "test": "echo \"No tests specified\" && exit 0"
+    },
+    "keywords": [
+        "patch",
+        "ps2",
+        "netemu",
+        "binary",
+        "converter"
+    ],
+    "author": "Leonardo Meireles",
+    "license": "MIT",
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.21.1",
+        "multer": "^1.4.5-lts.1",
+        "node-cron": "^3.0.3"
+    },
+    "devDependencies": {
+        "eslint": "^8.51.0"
+    }
+}
