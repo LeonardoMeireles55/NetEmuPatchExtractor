@@ -17,7 +17,9 @@ build/
 *.CONFIG
 
 # Pasta de uploads temporários
-src/public/statics/input/uploads
+src/public/statics/input/*
+src/public/statics/output/*
+
 
 # Arquivos de configuração do editor
 .vscode/
