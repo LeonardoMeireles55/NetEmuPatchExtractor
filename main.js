@@ -34,6 +34,6 @@ app.listen(port, () => {
 cron.schedule('*/2 * * * *', () => {
 
   console.log('Cron job running every minute');
-  PatchService.deleteOldFiles();
+  // PatchService.deleteOldFiles();
   
 });
