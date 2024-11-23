@@ -55,16 +55,6 @@
   }
   ```
 
-### Download Generated File
-- **Endpoint**: `GET /download`
-- **Description**: Downloads the generated patch file
-- **Query String**:
-  - `file` (required): Name of the file to download
-- **Request Example**:
-  ```bash
-  GET /download?file=converted_sample.bin.txt
-  ```
-
 ## Project Structure
 
 ```plaintext
