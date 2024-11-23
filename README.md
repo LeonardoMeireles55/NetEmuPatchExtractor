@@ -14,7 +14,7 @@
 
 ## Technologies Used
 
-- **Node.js** and **Express.js**: Backend and API routing
+- **Node.js** and **Express.js**: Backend and API routing -> https://nodejs.org/en/download/package-manager
 - **Multer**: File upload handling
 - **FS (File System)**: File management
 - **Path**: File path handling
