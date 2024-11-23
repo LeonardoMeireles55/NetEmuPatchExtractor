@@ -22,7 +22,7 @@ document.getElementById('fileForm').addEventListener('submit', async function(ev
 
     try {
         // Send file to server
-        const response = await fetch('http://localhost:3000/process-hex', {
+        const response = await fetch('../process-hex', {
             method: 'POST',
             body: formData
         });
