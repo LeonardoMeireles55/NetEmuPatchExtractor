@@ -40,7 +40,7 @@ const PatchController = {
     console.log(`Processing hex file: ${originalName}`);
 
     try {
-      const data = PatchService.processFile(filePath, outputFileName, originalName);
+      const data = await PatchService.processFile(filePath, outputFileName, originalName);
 
       return res.status(200).json({
         message: 'Hex file processing completed.',

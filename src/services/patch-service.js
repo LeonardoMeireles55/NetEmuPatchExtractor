@@ -118,7 +118,7 @@ class PatchService {
     return cleanHex.match(/.{2}/g).reverse().join("");
   }
 
-  static processFile(inputFileName, outputFileName, originalname) {
+  static async processFile(inputFileName, outputFileName, originalname) {
     const outputFilePath = path.resolve(__dirname, '/tmp/', outputFileName);
 
     console.log(originalname);
