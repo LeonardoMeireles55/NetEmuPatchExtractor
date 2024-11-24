@@ -4,31 +4,56 @@ const PatchService = require('../services/patch-service');
 
 const PatchController = {
 
-  async getFileFromTmp(req, res) {
+   async getFileFromTmp(req, res) {
     const fileName = req.params.fileName;
-  
+
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
-  
+
     const tmpFilePath = path.join('/tmp', fileName);
     
     try {
-      await fs.access(tmpFilePath);
-      
-      const stats = await fs.stat(tmpFilePath);
-      if (stats.size === 0) {
-        return res.status(400).json({ error: 'File is empty' });
+      // Função que verifica se o arquivo está pronto
+      const waitForFile = async () => {
+        let isReady = false;
+        let attempts = 0;
+
+        while (!isReady && attempts < 10) {  // Tenta 10 vezes, ajustável
+          try {
+            // Verifica se o arquivo existe e se está pronto
+            await fs.access(tmpFilePath);  // Verifica se o arquivo existe
+
+            // Verifica se o arquivo tem tamanho maior que 0
+            const stats = await fs.stat(tmpFilePath);
+            isReady = stats.size > 0;
+          } catch (err) {
+            console.error('File not ready yet:', err);
+          }
+
+          if (!isReady) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1 segundo antes de tentar novamente
+            attempts++;
+          }
+        }
+
+        return isReady;
+      };
+
+      // Aguarda até o arquivo estar pronto
+      const isFileReady = await waitForFile();
+      if (!isFileReady) {
+        return res.status(400).json({ error: 'File is not ready' });
       }
-  
-      console.log('sending file:', tmpFilePath);
+
+      console.log('Sending file:', tmpFilePath);
       return res.download(tmpFilePath, fileName, (err) => {
         if (err) {
           console.error('Error sending file:', err);
           return res.status(500).json({ error: 'Error sending file' });
         }
       });
-  
+
     } catch (err) {
       console.error('Error reading the file:', err);
       return res.status(500).json({ error: 'Error reading the file' });
