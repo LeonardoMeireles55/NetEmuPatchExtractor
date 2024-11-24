@@ -98,4 +98,5 @@ module.exports = {
   createTableAndInsertBatches,
   getHashByGameIDOrAlt,
   ensureTableExists,
+  getDatabaseConnection
 };
