@@ -4,36 +4,37 @@
     "description": "A tool for extracting and converting patches with the 0x0A command from PS2 NetEmu binary files.",
     "main": "main.js",
     "scripts": {
-      "start": "node main.js",
-      "start:server": "node main.js --server",
-      "start:dev": "node main.js --dev",
-      "extract": "node main.js --extract",
-      "convert": "node main.js --convert",
-      "lint": "eslint src --ext .js",
-      "lint:fix": "eslint src --ext .js --fix",
-      "validate": "npm run lint",
-      "build": "echo 'No build step necessary for this project' && exit 0",  
-      "vercel-build": "echo 'Vercel build step' && exit 0"  
+        "start": "node main.js",
+        "start:server": "node main.js --server",
+        "start:dev": "node main.js --dev",
+        "extract": "node main.js --extract",
+        "convert": "node main.js --convert",
+        "lint": "eslint src --ext .js",
+        "lint:fix": "eslint src --ext .js --fix",
+        "validate": "npm run lint",
+        "build": "echo 'No build step necessary for this project' && exit 0",
+        "vercel-build": "echo 'Vercel build step' && exit 0"
     },
     "keywords": [
-      "patch",
-      "ps2",
-      "netemu",
-      "binary",
-      "converter"
+        "patch",
+        "ps2",
+        "netemu",
+        "binary",
+        "converter"
     ],
     "author": "Leonardo Meireles",
     "license": "MIT",
     "dependencies": {
-      "cors": "^2.8.5",
-      "express": "^4.21.1",
-      "multer": "^1.4.5-lts.1",
-      "node-cron": "^3.0.3"
+        "cors": "^2.8.5",
+        "express": "^4.21.1",
+        "multer": "^1.4.5-lts.1",
+        "node-cron": "^3.0.3",
+        "sqlite3": "^5.1.7"
     },
     "devDependencies": {
-      "eslint": "^8.51.0"
+        "eslint": "^8.51.0"
     },
     "engines": {
-      "node": ">=14.0.0"
+        "node": ">=14.0.0"
     }
-  }
+}

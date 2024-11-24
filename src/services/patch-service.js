@@ -2,8 +2,32 @@ const fs = require('fs');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log'); 
+const { getDatabaseConnection } = require('../database/sqlite3-db.js');
+
 
 class PatchService {
+
+  static formatHash(input) {
+     // Certifica-se de que a entrada é tratada como um número
+  let hexString = input.toString(16).toUpperCase().slice(2); // Converte para hexadecimal, sem '0x'
+
+  // Preenche com zeros à esquerda para garantir que a string tenha comprimento múltiplo de 2
+  while (hexString.length % 2 !== 0) {
+    hexString = '0' + hexString;
+  }
+
+  // Divide a string em pares de caracteres (2 dígitos por vez)
+  const formattedHex = [];
+  for (let i = 0; i < hexString.length; i += 2) {
+    formattedHex.push(hexString.substring(i, i + 2));
+  }
+
+  // Junta os pares de hexadecimais com espaço
+  const result = formattedHex.join(' ');
+
+  return result;
+  }
+  
 
   static findCommandLocalization(data) {
     const locations = [];
@@ -17,6 +41,16 @@ class PatchService {
     }
     return locations.length === 0 ? -1 : locations;
   }
+  static isMultipleOf8(hexValue) {
+    const num = parseInt(hexValue, 16);
+    return num % 8 === 0;
+    }
+  
+  static roundToNearestMultipleOf8(hexValue) {
+    const num = parseInt(hexValue, 16);
+    return (Math.round(num / 8) * 8).toString(16).toUpperCase();
+    }
+
 
   static extractPatches(data) {
     const locations = PatchService.findCommandLocalization(data);
@@ -56,33 +90,63 @@ class PatchService {
     return allPatches;
   }
 
+  static async getHashByGameIDOrAlt(gameID, altGameID) {
+    const slicedGameID = gameID.slice(0, -7);
+    const slicedAltGameID = altGameID.slice(0, -7);
+
+    console.log(slicedGameID, slicedAltGameID);
+
+    const db = getDatabaseConnection();
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT hash FROM games WHERE gameID = ? OR altGameID = ?`,
+        [slicedGameID, slicedAltGameID],
+        (err, row) => {
+          db.close();
+          if (err) {
+            reject('Error on searching hash: ' + err);
+          } else {
+            resolve(row ? this.formatHash(row.hash) : null);
+          }
+        }
+      );
+    });
+  }
+  
   static toBigEndian(hexString) {
     const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
     return cleanHex.match(/.{2}/g).reverse().join("");
   }
 
-  static processFile(inputFileName, outputFileName, originalname) {
+  static async processFile(inputFileName, outputFileName, originalname) {
     const outputFilePath = path.resolve(__dirname, '/tmp/', outputFileName);
 
-    fs.readFile(inputFileName, (err, data) => {
+    console.log(originalname);
+
+    fs.readFile(inputFileName, async (err, data) => {
       if (err) {
         logger.error("Error reading the binary file:", err.message);
         return;
       }
 
       const patches = PatchService.extractPatches(data);
+      let cmdCount = 0;
       let netEmuToPnach = [];
       let outputLines = [`Extracted Patches: ${originalname}\n\n`];
+
+      const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
+
 
       patches.forEach((occurrence, index) => {
         outputLines.push(`${occurrence.occurrence}:\n\n`);
 
         occurrence.patches.forEach((patch, patchIndex) => {
+          cmdCount++;
           const bigEndianOffset = PatchService.toBigEndian(patch.offset);
           const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
           const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
 
-          netEmuToPnach.push({ EE: bigEndianOffset, WORD: bigEndianReplaceOpcode });
+          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD:bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
 
           outputLines.push(
             `  Patch: ${patchIndex + 1}\n` +
@@ -107,9 +171,22 @@ class PatchService {
         outputContent += `patch=1,EE,${patch.EE},word,${patch.WORD}\n`;
       });
 
+      outputContent += `//-----------------------------------\n\n
+      // NetEmu to GxEmu:\n// Game Title: ${originalname} -> Hash: ${hashGameCode} \n\n`;
+
+      outputContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
+      outputContent += `00 00 00 08 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + cmdCount.toString() : cmdCount.toString()} 00 00 00 00 \n`;
+
+      console.log(cmdCount);
+      
+      netEmuToPnach.forEach((patch) => {
+        outputContent += `${patch.EE} 00000000 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD}\n`;
+      });
+
       logger.log(outputContent);
 
-      fs.writeFile(outputFilePath, outputContent, 'utf8', (writeErr) => {
+      
+      fs.writeFile(outputFilePath, outputContent, 'latin1', (writeErr) => {
         if (writeErr) {
           logger.error("Error saving the file:", writeErr.message);
           return;
@@ -119,6 +196,7 @@ class PatchService {
     });
     return outputFilePath;
   }
+
  static deleteOldFiles() {
     const outputDirectory = path.resolve(__dirname, '/tmp');
     fs.readdir(outputDirectory, (err, files) => {
@@ -127,7 +205,9 @@ class PatchService {
         return;
       }
       files.forEach((file) => {
-        if(file === 'log-file.log') return;
+        if (file === 'log-file.log' || file === 'games.db') {
+          return;
+        }
         const filePath = path.resolve(outputDirectory, file);
         fs.unlink(filePath, (unlinkErr) => {
           if (unlinkErr) {
@@ -139,5 +219,6 @@ class PatchService {
       });
     });
   }
+  
 }
 module.exports = PatchService;

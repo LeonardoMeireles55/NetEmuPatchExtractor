@@ -1,32 +1,57 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const PatchService = require('../services/patch-service');
 
 const PatchController = {
 
-  async getFileFromTmp(req, res) {
-    const fileName = req.params.fileName;  // Recebe o nome do arquivo a partir do parâmetro da URL
+   async getFileFromTmp(req, res) {
+    const fileName = req.params.fileName;
 
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
 
-    const tmpFilePath = path.join('/tmp', fileName); // Caminho completo do arquivo no diretório tmp
+    const tmpFilePath = path.join('/tmp', fileName);
+    
     try {
-      // Verifica se o arquivo existe
-      if (!fs.existsSync(tmpFilePath)) {
-        return res.status(404).json({ error: 'File not found' });
+      const waitForFile = async () => {
+        let isReady = false;
+        let attempts = 0;
+
+        while (!isReady && attempts < 10) { 
+          try {
+            await fs.access(tmpFilePath);  
+
+            const stats = await fs.stat(tmpFilePath);
+            isReady = stats.size > 0;
+          } catch (err) {
+            console.error('File not ready yet:', err);
+          }
+
+          if (!isReady) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            attempts++;
+          }
+        }
+
+        return isReady;
+      };
+
+      const isFileReady = await waitForFile();
+      if (!isFileReady) {
+        return res.status(400).json({ error: 'File is not ready' });
       }
 
-      // Envia o arquivo para o cliente
-      res.download(tmpFilePath, fileName, (err) => {
+      console.log('Sending file:', tmpFilePath);
+      return res.download(tmpFilePath, fileName, (err) => {
         if (err) {
-          console.error('Erro ao enviar o arquivo:', err);
+          console.error('Error sending file:', err);
           return res.status(500).json({ error: 'Error sending file' });
         }
       });
+
     } catch (err) {
-      console.error('Erro ao ler o arquivo:', err);
+      console.error('Error reading the file:', err);
       return res.status(500).json({ error: 'Error reading the file' });
     }
   },
@@ -44,7 +69,7 @@ const PatchController = {
     console.log(`Processing hex file: ${originalName}`);
 
     try {
-      const data = PatchService.processFile(filePath, outputFileName, originalName);
+      const data = await PatchService.processFile(filePath, outputFileName, originalName);
 
       return res.status(200).json({
         message: 'Hex file processing completed.',
