@@ -6,7 +6,8 @@ const cron = require('node-cron');
 
 const PatchController = require('./src/controllers/patch-controller');
 const PatchService = require('./src/services/patch-service');
-const { createTableAndInsertBatches, getHashByGameIDOrAlt } = require('./src/database/sqlite3-db.js');
+const { createTableAndInsertBatches, getHashByGameIDOrAlt, ensureTableExists } = require('./src/database/sqlite3-db.js');
+
 
 
 const app = express();
@@ -26,21 +27,14 @@ app.get('/', (req, res) => {
 
 app.get('/hash/:gameID', async (req, res) => {
   const gameID = req.params.gameID;
-  const hash = await getHashByGameIDOrAlt(gameID, gameID);
-  res.json({ hash });
-});
-
-async function getFileFromTmp(fileName) {
-  const tmpFilePath = path.join('/tmp', fileName);
   try {
-      const fileData = await fs.promises.readFile(tmpFilePath);
-      console.log(`Arquivo lido de: ${tmpFilePath}`);
-      return fileData;
-  } catch (err) {
-      console.error('Erro ao ler o arquivo:', err);
-      throw err;
+    const hash = await getHashByGameIDOrAlt(gameID, gameID);
+    res.json({ hash });
+  } catch (error) {
+    console.error('Error on searching hash', error);
+    res.status(500).json({ error: 'Search was failed' });
   }
-}
+});
 
 app.get('/download/:fileName', (req, res) => PatchController.getFileFromTmp(req, res));
 
@@ -48,14 +42,42 @@ app.get('/download/:fileName', (req, res) => PatchController.getFileFromTmp(req,
 app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
 
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-  createTableAndInsertBatches(path.join(__dirname, 'public', 'hashes', 'hashes.txt'));
-});
+(async () => {
+  try {
+    console.log('Initializing database...');
+    
+    const tableExists = await ensureTableExists();
+    if (!tableExists) {
+      console.log('Table "games" does not exist, creating...');
+      await createTableAndInsertBatches(path.join(__dirname, 'public', 'hashes', 'hashes.txt'));
+    } else {
+      console.log('Table "games" already exists');
+    }
 
-cron.schedule('*/2 * * * *', () => {
+    app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error('Error on initialize database: -> ', error);
+    process.exit(1);
+  }
+})();
+
+cron.schedule('*/3 * * * *', () => {
 
   console.log('Cron job running every minute');
   PatchService.deleteOldFiles();
   
 });
+
+// async function getFileFromTmp(fileName) {
+//   const tmpFilePath = path.join('/tmp', fileName);
+//   try {
+//       const fileData = await fs.promises.readFile(tmpFilePath);
+//       console.log(`Arquivo lido de: ${tmpFilePath}`);
+//       return fileData;
+//   } catch (err) {
+//       console.error('Erro ao ler o arquivo:', err);
+//       throw err;
+//   }
+// }

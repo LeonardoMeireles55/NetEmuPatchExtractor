@@ -3,6 +3,21 @@ const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log'); 
 
+const ignoreList = [
+  'log-file.log',
+  'games.db',
+  '.ICE-unix',
+  '.X11-unix',
+  '.XIM-unix',
+  '.font-unix',
+  'leonardo-code-zsh',
+  'snap-private-tmp',
+  'systemd-private-c136956212834f9089885a4faa18ca62-systemd-logind.service-lCehh5',
+  'systemd-private-c136956212834f9089885a4faa18ca62-systemd-resolved.service-uchAG9',
+  'systemd-private-c136956212834f9089885a4faa18ca62-systemd-timesyncd.service-TjA1hn',
+  'vscode-typescript1002',
+];
+
 class PatchService {
 
   static findCommandLocalization(data) {
@@ -144,7 +159,9 @@ class PatchService {
         return;
       }
       files.forEach((file) => {
-        if(file === 'log-file.log') return;
+        if (ignoreList.includes(file.name)) {
+          return;
+        }
         const filePath = path.resolve(outputDirectory, file);
         fs.unlink(filePath, (unlinkErr) => {
           if (unlinkErr) {
