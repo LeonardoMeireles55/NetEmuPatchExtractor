@@ -1,28 +1,38 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const PatchService = require('../services/patch-service');
 
 const PatchController = {
 
   async getFileFromTmp(req, res) {
-    const fileName = req.params.fileName;  
-
+    const fileName = req.params.fileName;
+  
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
-
-    const tmpFilePath = path.join('/tmp', fileName); 
+  
+    const tmpFilePath = path.join('/tmp', fileName);
+    
     try {
-        console.log('searching file:', tmpFilePath);
-        res.download(tmpFilePath, fileName, (err) => {
-          if (err) {
-            console.error('Erro ao enviar o arquivo:', err);
-            return res.status(500).json({ error: 'Error sending file' });
-          }
-        });
-
+      // Verificar se o arquivo existe e se tem conteúdo
+      await fs.access(tmpFilePath);
+      
+      // Verificar se o arquivo tem tamanho maior que zero
+      const stats = await fs.stat(tmpFilePath);
+      if (stats.size === 0) {
+        return res.status(400).json({ error: 'File is empty' });
+      }
+  
+      console.log('sending file:', tmpFilePath);
+      return res.download(tmpFilePath, fileName, (err) => {
+        if (err) {
+          console.error('Error sending file:', err);
+          return res.status(500).json({ error: 'Error sending file' });
+        }
+      });
+  
     } catch (err) {
-      console.error('Erro ao ler o arquivo:', err);
+      console.error('Error reading the file:', err);
       return res.status(500).json({ error: 'Error reading the file' });
     }
   },
