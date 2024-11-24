@@ -5,6 +5,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 
 const PatchController = require('./src/controllers/patch-controller');
+const PatchService = require('./src/services/patch-service');
 
 const app = express();
 const port = 3000;
@@ -46,6 +47,6 @@ app.listen(port, () => {
 cron.schedule('*/2 * * * *', () => {
 
   console.log('Cron job running every minute');
-  // PatchService.deleteOldFiles();
+  PatchService.deleteOldFiles();
   
 });
