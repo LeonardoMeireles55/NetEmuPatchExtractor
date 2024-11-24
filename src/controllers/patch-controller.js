@@ -17,15 +17,15 @@ const PatchController = {
         return res.status(404).json({ error: 'File not found' });
       }
 
-      setTimeout(() => {
+      setTimeout(async () => {
         console.log('searching file:', tmpFilePath);
-        res.download(tmpFilePath, fileName, (err) => {
+        await res.download(tmpFilePath, fileName, (err) => {
           if (err) {
             console.error('Erro ao enviar o arquivo:', err);
             return res.status(500).json({ error: 'Error sending file' });
           }
         });
-      }, 4000);
+      }, 2500);
 
       
     } catch (err) {
