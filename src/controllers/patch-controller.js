@@ -13,18 +13,21 @@ const PatchController = {
 
     const tmpFilePath = path.join('/tmp', fileName); // Caminho completo do arquivo no diretório tmp
     try {
-      // Verifica se o arquivo existe
       if (!fs.existsSync(tmpFilePath)) {
         return res.status(404).json({ error: 'File not found' });
       }
 
-      // Envia o arquivo para o cliente
-      res.download(tmpFilePath, fileName, (err) => {
-        if (err) {
-          console.error('Erro ao enviar o arquivo:', err);
-          return res.status(500).json({ error: 'Error sending file' });
-        }
-      });
+      setTimeout(() => {
+        console.log('searching file:', tmpFilePath);
+        res.download(tmpFilePath, fileName, (err) => {
+          if (err) {
+            console.error('Erro ao enviar o arquivo:', err);
+            return res.status(500).json({ error: 'Error sending file' });
+          }
+        });
+      }, 4000);
+
+      
     } catch (err) {
       console.error('Erro ao ler o arquivo:', err);
       return res.status(500).json({ error: 'Error reading the file' });

@@ -36,7 +36,7 @@ app.get('/hash/:gameID', async (req, res) => {
   }
 });
 
-app.get('/download/:fileName', (req, res) => PatchController.getFileFromTmp(req, res));
+app.get('/download/:fileName', async (req, res) => await PatchController.getFileFromTmp(req, res));
 
 
 app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
