@@ -14,10 +14,8 @@ const PatchController = {
     const tmpFilePath = path.join('/tmp', fileName);
     
     try {
-      // Verificar se o arquivo existe e se tem conteúdo
       await fs.access(tmpFilePath);
       
-      // Verificar se o arquivo tem tamanho maior que zero
       const stats = await fs.stat(tmpFilePath);
       if (stats.size === 0) {
         return res.status(400).json({ error: 'File is empty' });

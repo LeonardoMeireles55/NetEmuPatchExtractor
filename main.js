@@ -36,8 +36,14 @@ app.get('/hash/:gameID', async (req, res) => {
   }
 });
 
-app.get('/download/:fileName', async (req, res) => await PatchController.getFileFromTmp(req, res));
-
+app.get('/download/:fileName', async (req, res) => {
+  try {
+    await PatchController.getFileFromTmp(req, res);
+  } catch (err) {
+    console.error('Error in /download route:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
 
