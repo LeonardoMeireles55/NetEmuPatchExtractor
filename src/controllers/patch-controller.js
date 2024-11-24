@@ -14,7 +14,7 @@ const PatchController = {
     const tmpFilePath = path.join('/tmp', fileName); 
     try {
         console.log('searching file:', tmpFilePath);
-        await res.download(tmpFilePath, fileName, (err) => {
+        res.download(tmpFilePath, fileName, (err) => {
           if (err) {
             console.error('Erro ao enviar o arquivo:', err);
             return res.status(500).json({ error: 'Error sending file' });
