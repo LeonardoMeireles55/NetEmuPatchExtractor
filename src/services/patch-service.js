@@ -127,6 +127,7 @@ class PatchService {
         return;
       }
       files.forEach((file) => {
+        if(file === 'log-file.log') return;
         const filePath = path.resolve(outputDirectory, file);
         fs.unlink(filePath, (unlinkErr) => {
           if (unlinkErr) {
