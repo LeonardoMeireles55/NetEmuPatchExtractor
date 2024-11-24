@@ -14,17 +14,14 @@ const PatchController = {
     const tmpFilePath = path.join('/tmp', fileName);
     
     try {
-      // Função que verifica se o arquivo está pronto
       const waitForFile = async () => {
         let isReady = false;
         let attempts = 0;
 
-        while (!isReady && attempts < 10) {  // Tenta 10 vezes, ajustável
+        while (!isReady && attempts < 10) { 
           try {
-            // Verifica se o arquivo existe e se está pronto
-            await fs.access(tmpFilePath);  // Verifica se o arquivo existe
+            await fs.access(tmpFilePath);  
 
-            // Verifica se o arquivo tem tamanho maior que 0
             const stats = await fs.stat(tmpFilePath);
             isReady = stats.size > 0;
           } catch (err) {
@@ -32,7 +29,7 @@ const PatchController = {
           }
 
           if (!isReady) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1 segundo antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
             attempts++;
           }
         }
@@ -40,7 +37,6 @@ const PatchController = {
         return isReady;
       };
 
-      // Aguarda até o arquivo estar pronto
       const isFileReady = await waitForFile();
       if (!isFileReady) {
         return res.status(400).json({ error: 'File is not ready' });

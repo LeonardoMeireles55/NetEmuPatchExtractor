@@ -14,18 +14,19 @@ document.addEventListener('DOMContentLoaded', function() {
     downloadLink.addEventListener('click', function(e) {
         // Only trigger animation if it's a real download (has href)
         if (this.getAttribute('href') !== '#') {
-            this.classList.add('loading-button');
-            this.disabled = true;
-            
-            const icon = this.querySelector('.download-icon');
-            icon.classList.add('spin');
-            
+
+                this.classList.add('loading-button');
+                this.disabled = true;
+
+                const icon = this.querySelector('.download-icon');
+                icon.classList.add('spin');
+
             // Remove animation after 4 seconds
             setTimeout(() => {
                 this.classList.remove('loading-button');
                 this.disabled = false;
                 icon.classList.remove('spin');
-            }, 4000);
+            }, 2000);
         }
     });
 });
@@ -67,7 +68,10 @@ document.getElementById('fileForm').addEventListener('submit', async function(ev
         }
         
         logOutput.textContent = `Status: ${data.message}`;
-        downloadSection.classList.remove('hidden');
+
+        setTimeout(() => {
+            downloadSection.classList.remove('hidden');
+        }, 1000);
         
         const downloadLink = document.getElementById('downloadLink');
         downloadLink.href = data.downloadLink;
