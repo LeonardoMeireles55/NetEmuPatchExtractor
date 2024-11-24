@@ -64,6 +64,8 @@ class PatchService {
   static processFile(inputFileName, outputFileName, originalname) {
     const outputFilePath = path.resolve(__dirname, '/tmp/', outputFileName);
 
+    console.log(originalname);
+
     fs.readFile(inputFileName, (err, data) => {
       if (err) {
         logger.error("Error reading the binary file:", err.message);
@@ -71,6 +73,7 @@ class PatchService {
       }
 
       const patches = PatchService.extractPatches(data);
+      let cmdCount = 1;
       let netEmuToPnach = [];
       let outputLines = [`Extracted Patches: ${originalname}\n\n`];
 
@@ -78,11 +81,12 @@ class PatchService {
         outputLines.push(`${occurrence.occurrence}:\n\n`);
 
         occurrence.patches.forEach((patch, patchIndex) => {
+          cmdCount++;
           const bigEndianOffset = PatchService.toBigEndian(patch.offset);
           const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
           const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
 
-          netEmuToPnach.push({ EE: bigEndianOffset, WORD: bigEndianReplaceOpcode });
+          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD:bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
 
           outputLines.push(
             `  Patch: ${patchIndex + 1}\n` +
@@ -107,9 +111,21 @@ class PatchService {
         outputContent += `patch=1,EE,${patch.EE},word,${patch.WORD}\n`;
       });
 
+      outputContent += `//-----------------------------------\n\n
+      // NetEmu to GxEmu:\n// Game Title: ${originalname}\n\n`;
+
+      outputContent += `00 00 00 1B E1 1D B1 0D 00 34 11 78 00 00 00 01 `;
+      outputContent += `00 00 00 00 00 34 11 88 00 00 00 ${cmdCount < 10 ? '0' + cmdCount.toString() : cmdCount.toString()} 00 00 00 00 \n`;
+
+      console.log(cmdCount);
+      
+      netEmuToPnach.forEach((patch) => {
+        outputContent += `${patch.EE} 00000000 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD}\n`;
+      });
+
       logger.log(outputContent);
 
-      fs.writeFile(outputFilePath, outputContent, 'utf8', (writeErr) => {
+      fs.writeFile(outputFilePath, outputContent, 'latin1', (writeErr) => {
         if (writeErr) {
           logger.error("Error saving the file:", writeErr.message);
           return;
@@ -119,6 +135,7 @@ class PatchService {
     });
     return outputFilePath;
   }
+
  static deleteOldFiles() {
     const outputDirectory = path.resolve(__dirname, '/tmp');
     fs.readdir(outputDirectory, (err, files) => {
@@ -139,5 +156,6 @@ class PatchService {
       });
     });
   }
+  
 }
 module.exports = PatchService;

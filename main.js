@@ -6,6 +6,8 @@ const cron = require('node-cron');
 
 const PatchController = require('./src/controllers/patch-controller');
 const PatchService = require('./src/services/patch-service');
+const { createTableAndInsertBatches, getHashByGameIDOrAlt } = require('./src/database/sqlite3-db.js');
+
 
 const app = express();
 const port = 3000;
@@ -20,6 +22,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/hash/:gameID', async (req, res) => {
+  const gameID = req.params.gameID;
+  const hash = await getHashByGameIDOrAlt(gameID, gameID);
+  res.json({ hash });
 });
 
 async function getFileFromTmp(fileName) {
@@ -42,6 +50,7 @@ app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+  createTableAndInsertBatches(path.join(__dirname, 'public', 'hashes', 'hashes.txt'));
 });
 
 cron.schedule('*/2 * * * *', () => {
