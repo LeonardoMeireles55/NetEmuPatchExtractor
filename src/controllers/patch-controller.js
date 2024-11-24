@@ -5,17 +5,14 @@ const PatchService = require('../services/patch-service');
 const PatchController = {
 
   async getFileFromTmp(req, res) {
-    const fileName = req.params.fileName;  // Recebe o nome do arquivo a partir do parâmetro da URL
+    const fileName = req.params.fileName;  
 
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
 
-    const tmpFilePath = path.join('/tmp', fileName); // Caminho completo do arquivo no diretório tmp
+    const tmpFilePath = path.join('/tmp', fileName); 
     try {
-      if (!fs.existsSync(tmpFilePath)) {
-        return res.status(404).json({ error: 'File not found' });
-      }
         console.log('searching file:', tmpFilePath);
         await res.download(tmpFilePath, fileName, (err) => {
           if (err) {
