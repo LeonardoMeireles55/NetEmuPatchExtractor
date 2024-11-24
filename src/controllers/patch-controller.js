@@ -16,8 +16,6 @@ const PatchController = {
       if (!fs.existsSync(tmpFilePath)) {
         return res.status(404).json({ error: 'File not found' });
       }
-
-      setTimeout(async () => {
         console.log('searching file:', tmpFilePath);
         await res.download(tmpFilePath, fileName, (err) => {
           if (err) {
@@ -25,9 +23,7 @@ const PatchController = {
             return res.status(500).json({ error: 'Error sending file' });
           }
         });
-      }, 2500);
 
-      
     } catch (err) {
       console.error('Erro ao ler o arquivo:', err);
       return res.status(500).json({ error: 'Error reading the file' });
