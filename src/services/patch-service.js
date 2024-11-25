@@ -2,27 +2,22 @@ const fs = require('fs');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log'); 
-const { getDatabaseConnection } = require('../database/sqlite3-db.js');
+const { findHashByGameID } = require('../database/sqlite3-db.js');
 
 
 class PatchService {
 
   static formatHash(input) {
-     // Certifica-se de que a entrada é tratada como um número
-  let hexString = input.toString(16).toUpperCase().slice(2); // Converte para hexadecimal, sem '0x'
-
-  // Preenche com zeros à esquerda para garantir que a string tenha comprimento múltiplo de 2
+  let hexString = input.toString(16).toUpperCase().slice(2);
   while (hexString.length % 2 !== 0) {
     hexString = '0' + hexString;
   }
 
-  // Divide a string em pares de caracteres (2 dígitos por vez)
   const formattedHex = [];
   for (let i = 0; i < hexString.length; i += 2) {
     formattedHex.push(hexString.substring(i, i + 2));
   }
 
-  // Junta os pares de hexadecimais com espaço
   const result = formattedHex.join(' ');
 
   return result;
@@ -93,24 +88,12 @@ class PatchService {
   static async getHashByGameIDOrAlt(gameID, altGameID) {
     const slicedGameID = gameID.slice(0, -7);
     const slicedAltGameID = altGameID.slice(0, -7);
+    console.log("Sliced Game ID ->>>>> ", slicedGameID);
 
-    console.log(slicedGameID, slicedAltGameID);
+    const hash = await findHashByGameID(slicedGameID, slicedAltGameID);
+    console.log("Hash ->>>>> ", hash);
 
-    const db = getDatabaseConnection();
-    return new Promise((resolve, reject) => {
-      db.get(
-        `SELECT hash FROM games WHERE gameID = ? OR altGameID = ?`,
-        [slicedGameID, slicedAltGameID],
-        (err, row) => {
-          db.close();
-          if (err) {
-            reject('Error on searching hash: ' + err);
-          } else {
-            resolve(row ? this.formatHash(row.hash) : null);
-          }
-        }
-      );
-    });
+    return hash;
   }
   
   static toBigEndian(hexString) {
