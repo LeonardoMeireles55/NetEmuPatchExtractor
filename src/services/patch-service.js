@@ -117,7 +117,7 @@ class PatchService {
       let netEmuToPnach = [];
       let outputLines = [`Extracted Patches: ${originalname}\n\n`];
 
-      const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
+      const hashGameCode = this.formatHash(await this.getHashByGameIDOrAlt(originalname, originalname));
 
 
       patches.forEach((occurrence, index) => {
