@@ -6,7 +6,7 @@ const cron = require('node-cron');
 
 const PatchController = require('./src/controllers/patch-controller');
 const PatchService = require('./src/services/patch-service');
-const { createTableAndInsertBatches, getHashByGameIDOrAlt, ensureTableExists } = require('./src/database/sqlite3-db.js');
+const { createTableAndInsertBatches, findHashByGameID, ensureTableExists, dropTable } = require('./src/database/sqlite3-db.js');
 
 
 
@@ -28,7 +28,7 @@ app.get('/', (req, res) => {
 app.get('/hash/:gameID', async (req, res) => {
   const gameID = req.params.gameID;
   try {
-    const hash = await getHashByGameIDOrAlt(gameID, gameID);
+    const hash = await findHashByGameID(gameID, gameID);
     res.json({ hash });
   } catch (error) {
     console.error('Error on searching hash', error);
@@ -51,7 +51,6 @@ app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
 (async () => {
   try {
     console.log('Initializing database...');
-    
     const tableExists = await ensureTableExists();
     if (!tableExists) {
       console.log('Table "games" does not exist, creating...');
