@@ -125,6 +125,9 @@ class PatchService {
 
         occurrence.patches.forEach((patch, patchIndex) => {
           cmdCount++;
+          if(cmdCount > 31) {
+            return;
+          }
           const bigEndianOffset = PatchService.toBigEndian(patch.offset);
           const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
           const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
