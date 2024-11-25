@@ -159,16 +159,28 @@ class PatchService {
 
       outputContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
       outputContent += `00 00 00 08 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + cmdCount.toString() : cmdCount.toString()} 00 00 00 00 \n`;
-
-      console.log(cmdCount);
-      
+    
       netEmuToPnach.forEach((patch) => {
         outputContent += `${patch.EE} 00000000 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD}\n`;
       });
 
       logger.log(outputContent);
 
-      
+    // New Format:
+    outputContent += `//-----------------------------------\n\n
+    // NetEmu to GxEmu-2:\n// Game Title: ${originalname} -> Hash: ${hashGameCode} \n\n`;
+    outputContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
+    outputContent += `00 00 00 08 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + (cmdCount / 2).toString() : (cmdCount / 2).toString()} 00 00 00 00 \n`;
+
+    netEmuToPnach.forEach((patch, index, array) => {
+      if (index % 2 === 0 && array[index + 1]) {
+        const first = array[index];
+        const second = array[index + 1];
+        outputContent += `${first.EE} 00000000 ${second.OriginalWORD} ${first.OriginalWORD} ${second.WORD} ${first.WORD}\n`;
+      }
+    });
+    
+
       fs.writeFile(outputFilePath, outputContent, 'latin1', (writeErr) => {
         if (writeErr) {
           logger.error("Error saving the file:", writeErr.message);
