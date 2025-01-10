@@ -25,6 +25,7 @@
     "author": "Leonardo Meireles",
     "license": "MIT",
     "dependencies": {
+        "adm-zip": "^0.5.16",
         "cors": "^2.8.5",
         "express": "^4.21.1",
         "multer": "^1.4.5-lts.1",

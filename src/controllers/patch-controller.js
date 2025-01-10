@@ -4,7 +4,7 @@ const PatchService = require('../services/patch-service');
 
 const PatchController = {
 
-   async getFileFromTmp(req, res) {
+  async getFileFromTmp(req, res) {
     const fileName = req.params.fileName;
 
     if (!fileName) {
@@ -12,15 +12,15 @@ const PatchController = {
     }
 
     const tmpFilePath = path.join('/tmp', fileName);
-    
+
     try {
       const waitForFile = async () => {
         let isReady = false;
         let attempts = 0;
 
-        while (!isReady && attempts < 10) { 
+        while (!isReady && attempts < 10) {
           try {
-            await fs.access(tmpFilePath);  
+            await fs.access(tmpFilePath);
 
             const stats = await fs.stat(tmpFilePath);
             isReady = stats.size > 0;
@@ -29,7 +29,7 @@ const PatchController = {
           }
 
           if (!isReady) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            await new Promise(resolve => setTimeout(resolve, 1000));
             attempts++;
           }
         }
@@ -60,11 +60,11 @@ const PatchController = {
     if (!req.file) {
       return res.status(400).json({ error: 'Hex file is required' });
     }
-    
 
-    const filePath = req.file.path; 
-    const originalName = req.file.originalname; 
-    const outputFileName = `converted_${originalName}.txt`;
+
+    const filePath = req.file.path;
+    const originalName = req.file.originalname;
+    const outputFileName = `${originalName}`.replace('.hex', '.txt', '.config');
 
     console.log(`Processing hex file: ${originalName}`);
 
@@ -73,13 +73,14 @@ const PatchController = {
 
       return res.status(200).json({
         message: 'Hex file processing completed.',
-        downloadLink: `/download/${outputFileName}`
+        downloadLink: `/download/${originalName}.zip`
       });
-      
+
     } catch (error) {
       console.error('Error processing hex file:', error.message);
       return res.status(500).json({ error: 'Error processing hex file' });
     }
-  }};
-  
+  }
+};
+
 module.exports = PatchController;

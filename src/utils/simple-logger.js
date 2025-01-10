@@ -12,6 +12,11 @@ class SimpleLogger {
     this._writeToLog('LOG', message, ...optionalParams);
   }
 
+
+  info(message, ...optionalParams) {
+    this._writeToLog('LOG', message, ...optionalParams);
+  }
+
   error(message, ...optionalParams) {
     this._writeToLog('ERROR', message, ...optionalParams);
   }

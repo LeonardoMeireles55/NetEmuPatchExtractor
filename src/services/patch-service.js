@@ -1,28 +1,97 @@
 const fs = require('fs');
+const AdmZip = require('adm-zip');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
-const logger = new SimpleLogger('/tmp/log-file.log'); 
+const logger = new SimpleLogger('/tmp/log-file.log');
 const { findHashByGameID } = require('../database/sqlite3-db.js');
 
 
 class PatchService {
 
+  static async saveAndZipFiles(originalOutputFilePath, outputFilePathText, outputFilePathHex, outputContent, onlyBinaryContent) {
+    try {
+      // Write text file
+      await fs.promises.writeFile(outputFilePathText, outputContent, 'latin1');
+      logger.log(`Text file saved: ${outputFilePathText}`);
+
+      // Write hex file
+      await this.writeHexFile(outputFilePathHex, onlyBinaryContent);
+      logger.log(`Hex file saved: ${outputFilePathHex}`);
+
+      // Verify files exist
+      const textExists = await fs.promises.access(outputFilePathText)
+        .then(() => true)
+        .catch(() => false);
+      const hexExists = await fs.promises.access(outputFilePathHex)
+        .then(() => true)
+        .catch(() => false);
+
+      if (!textExists || !hexExists) {
+        throw new Error('One or more files missing before zip creation');
+      }
+
+      // Create zip
+      const zip = new AdmZip();
+      const zipPath = originalOutputFilePath;
+
+      // Add files with proper names
+      zip.addLocalFile(outputFilePathText, '', path.basename(outputFilePathText));
+      zip.addLocalFile(outputFilePathHex, '', path.basename(outputFilePathHex));
+
+      // Write zip synchronously to ensure completion
+      zip.writeZipPromise = () => new Promise((resolve, reject) => {
+        try {
+          zip.writeZip(zipPath);
+          resolve(zipPath);
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      const finalZipPath = await zip.writeZipPromise();
+      logger.log(`Zip file created: ${finalZipPath}`);
+
+      return finalZipPath;
+    } catch (error) {
+      logger.error('Error in saveAndZipFiles:', error.message);
+      throw error;
+    }
+  }
+
   static formatHash(input) {
-  let hexString = input.toString(16).toUpperCase().slice(2);
-  while (hexString.length % 2 !== 0) {
-    hexString = '0' + hexString;
+    let hexString = input.toString(16).toUpperCase().slice(2);
+    while (hexString.length % 2 !== 0) {
+      hexString = '0' + hexString;
+    }
+
+    const formattedHex = [];
+    for (let i = 0; i < hexString.length; i += 2) {
+      formattedHex.push(hexString.substring(i, i + 2));
+    }
+
+    const result = formattedHex.join(' ');
+
+    return result;
   }
 
-  const formattedHex = [];
-  for (let i = 0; i < hexString.length; i += 2) {
-    formattedHex.push(hexString.substring(i, i + 2));
-  }
+  static writeHexFile = async (outputFilePath, hexString) => {
+    try {
+      // Remove spaces/newlines and validate hex
+      const cleanHex = hexString.replace(/\s+/g, '');
+      if (!/^[0-9A-Fa-f]+$/g.test(cleanHex)) {
+        throw new Error('Invalid hex string format');
+      }
 
-  const result = formattedHex.join(' ');
+      const buffer = Buffer.from(cleanHex, 'hex');
 
-  return result;
-  }
-  
+      // Write raw binary data
+      await fs.promises.writeFile(outputFilePath, buffer);
+      logger.log(`Hex file written to: ${outputFilePath}`);
+    } catch (error) {
+      logger.error('Error writing hex file:', error.message);
+      throw error;
+    }
+  };
 
   static findCommandLocalization(data) {
     const locations = [];
@@ -39,12 +108,12 @@ class PatchService {
   static isMultipleOf8(hexValue) {
     const num = parseInt(hexValue, 16);
     return num % 8 === 0;
-    }
-  
+  }
+
   static roundToNearestMultipleOf8(hexValue) {
     const num = parseInt(hexValue, 16);
     return (Math.round(num / 8) * 8).toString(16).toUpperCase();
-    }
+  }
 
 
   static extractPatches(data) {
@@ -53,6 +122,7 @@ class PatchService {
       logger.log("No occurrences of byte 0x0A found.");
       return [];
     }
+
 
     const allPatches = [];
     locations.forEach((commandLocalization, index) => {
@@ -95,14 +165,18 @@ class PatchService {
 
     return hash;
   }
-  
+
   static toBigEndian(hexString) {
     const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
     return cleanHex.match(/.{2}/g).reverse().join("");
   }
 
   static async processFile(inputFileName, outputFileName, originalname) {
-    const outputFilePath = path.resolve(__dirname, '/tmp/', outputFileName);
+    const outputFilePathText = path.resolve(__dirname, '/tmp/', outputFileName) + ".txt";
+    const outputFilePathHex = path.resolve(__dirname, '/tmp/', outputFileName);
+
+    const originalOutputFilePath = path.resolve(__dirname, '/tmp/', originalname) + ".zip";
+
 
     console.log(originalname);
 
@@ -125,14 +199,14 @@ class PatchService {
 
         occurrence.patches.forEach((patch, patchIndex) => {
           cmdCount++;
-          if(cmdCount > 31) {
+          if (cmdCount > 31) {
             return;
           }
           const bigEndianOffset = PatchService.toBigEndian(patch.offset);
           const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
           const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
 
-          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD:bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
+          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD: bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
 
           outputLines.push(
             `  Patch: ${patchIndex + 1}\n` +
@@ -149,6 +223,11 @@ class PatchService {
       });
 
       let outputContent = outputLines.join('');
+      let onlyBinaryContent = '';
+
+      onlyBinaryContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
+      onlyBinaryContent += `00 00 00 2C 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + cmdCount : cmdCount} 00 00 00 00 \n`;
+      onlyBinaryContent += netEmuToPnach.map((patch) => `${patch.EE} 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD} 00000000\n`).join('');
 
       outputContent += `//-----------------------------------\n\n
       // NetEmu to PNACH:\n// Game Title: ${originalname}\n\n`;
@@ -158,44 +237,32 @@ class PatchService {
       });
 
       outputContent += `//-----------------------------------\n\n
-      // NetEmu to GxEmu:\n// Game Title: ${originalname} -> Hash: ${hashGameCode} \n\n`;
-
+    // NetEmu to GxEmu (0x2C Command):\n// Game Title: ${originalname} -> Hash: ${hashGameCode} \n\n`;
       outputContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
-      outputContent += `00 00 00 08 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + cmdCount.toString() : cmdCount.toString()} 00 00 00 00 \n`;
-    
+      outputContent += `00 00 00 2C 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + cmdCount : cmdCount} 00 00 00 00 \n`;
       netEmuToPnach.forEach((patch) => {
-        outputContent += `${patch.EE} 00000000 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD}\n`;
+        outputContent += `${patch.EE} 00000000 ${patch.OriginalWORD} 00000000 ${patch.WORD} 00000000\n`;
       });
 
-      logger.log(outputContent);
 
-    // New Format:
-    outputContent += `//-----------------------------------\n\n
-    // NetEmu to GxEmu-2:\n// Game Title: ${originalname} -> Hash: ${hashGameCode} \n\n`;
-    outputContent += `00 00 00 ${hashGameCode} 00 34 11 78 00 00 00 01 `;
-    outputContent += `00 00 00 08 00 00 00 00 00 00 00 00 00 34 11 90 00 00 00 ${cmdCount < 10 ? '0' + (cmdCount / 2).toString() : (cmdCount / 2).toString()} 00 00 00 00 \n`;
+      // fs.writeFile(outputFilePathText, outputContent, 'latin1', (writeErr) => {
+      //   if (writeErr) {
+      //     logger.error("Error saving the file:", writeErr.message);
+      //     return;
+      //   }
+      //   logger.log(`Extracted patches saved to: ${outputFileName}`);
+      // });
 
-    netEmuToPnach.forEach((patch, index, array) => {
-      if (index % 2 === 0 && array[index + 1]) {
-        const first = array[index];
-        const second = array[index + 1];
-        outputContent += `${first.EE} 00000000 ${second.OriginalWORD} ${first.OriginalWORD} ${second.WORD} ${first.WORD}\n`;
-      }
+
+      // this.writeHexFile(outputFilePathHex, onlyBinaryContent);
+
+      const zipFile = await this.saveAndZipFiles(originalOutputFilePath, outputFilePathText, outputFilePathHex, outputContent, onlyBinaryContent);
+
+      return zipFile;
     });
-    
-
-      fs.writeFile(outputFilePath, outputContent, 'latin1', (writeErr) => {
-        if (writeErr) {
-          logger.error("Error saving the file:", writeErr.message);
-          return;
-        }
-        logger.log(`Extracted patches saved to: ${outputFileName}`);
-      });
-    });
-    return outputFilePath;
   }
 
- static deleteOldFiles() {
+  static deleteOldFiles() {
     const outputDirectory = path.resolve(__dirname, '/tmp');
     fs.readdir(outputDirectory, (err, files) => {
       if (err) {
@@ -217,6 +284,6 @@ class PatchService {
       });
     });
   }
-  
+
 }
 module.exports = PatchService;
