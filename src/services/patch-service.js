@@ -201,13 +201,13 @@ class PatchService {
               ReplaceOpcode: bigEndianReplaceOpcode
             }
           };
-          jsonContent.push(patchData);
 
           jsonOcurrences.push({
             GameTitle: originalname,
             HashGameCode: formattedHash,
-            Occurrence: occurrence.occurrence,
-            Patches: jsonContent[index]
+            Occurrence: occurrence,
+            PatchesLittleEndian: patchData.LittleEndian,
+            PatchesBigEndian: patchData.BigEndian
           })
         });
       });
