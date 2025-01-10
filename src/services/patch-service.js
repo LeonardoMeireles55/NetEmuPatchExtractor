@@ -171,6 +171,54 @@ class PatchService {
     return cleanHex.match(/.{2}/g).reverse().join("");
   }
 
+  static async buildJsonFromFile(filePath, originalname) {
+    try {
+      const data = await fs.promises.readFile(filePath);
+      const patches = PatchService.extractPatches(data);
+      let cmdCount = 0;
+      const jsonOcurrences = [];
+      const jsonContent = [];
+      const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
+      const formattedHash = this.formatHash(hashGameCode);
+
+      patches.forEach((occurrence, index) => {
+        occurrence.patches.forEach((patch) => {
+          cmdCount++;
+          if (cmdCount > 31) return;
+
+          const bigEndianOffset = PatchService.toBigEndian(patch.offset);
+          const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
+          const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
+          const patchData = {
+            LittleEndian: {
+              Offset: patch.offset,
+              OriginalOpcode: patch.originalOpcode,
+              ReplaceOpcode: patch.replaceOpcode
+            },
+            BigEndian: {
+              Offset: bigEndianOffset,
+              OriginalOpcode: bigEndianOriginalOpcode,
+              ReplaceOpcode: bigEndianReplaceOpcode
+            }
+          };
+          jsonContent.push(patchData);
+
+          jsonOcurrences.push({
+            GameTitle: originalname,
+            HashGameCode: formattedHash,
+            Occurrence: occurrence.occurrence,
+            Patches: jsonContent[index]
+          })
+        });
+      });
+
+      return jsonOcurrences;
+    } catch (error) {
+      logger.error("Error building JSON:", error.message);
+      throw error;
+    }
+  }
+
   static async processFile(inputFileName, outputFileName, originalname) {
     const outputFilePathText = path.resolve(__dirname, '/tmp/', outputFileName) + ".txt";
     const outputFilePathHex = path.resolve(__dirname, '/tmp/', outputFileName);

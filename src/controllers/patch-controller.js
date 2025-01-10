@@ -70,7 +70,8 @@ const PatchController = {
 
     try {
       const data = await PatchService.processFile(filePath, outputFileName, originalName);
-
+      const json = await PatchService.buildJsonFromFile(filePath, outputFileName);
+      console.log(json);
       return res.status(200).json({
         message: 'Hex file processing completed.',
         downloadLink: `/download/${originalName}.zip`
