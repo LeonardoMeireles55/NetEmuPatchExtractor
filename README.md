@@ -2,15 +2,14 @@
 
 ## Description
 
-**Patch Extractor** is a Node.js application that processes binary files to extract patch information, converting it into readable formats like PNACH, commonly used in PlayStation 2 emulators. It features a web interface for uploading files and downloading processed patches.
+**Patch Extractor** is a Node.js application that processes binary files to extract patch information, converting it into .CONFIG, commonly used in PlayStation 2 emulators(NET_EMU). It features a web interface for uploading files and downloading processed patches.
 
-> ⚠️ **Important Note**: This tool currently only extracts commands with opcode `0x0A`. Other commands will be ignored during the extraction process.
-
-## Features
+> ⚠️ **Important Note**: This tool currently only extracts commands and convert NET_EMU -> GX_EMU.
+> ## Features
 
 - Extract patches from binary files
 - Convert values to *big endian* and *little endian* formats
-- Generate `.txt` output files automatically
+- Generate `.zip` output files automatically
 
 ## Technologies Used
 
