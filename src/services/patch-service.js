@@ -98,13 +98,18 @@ class PatchService {
     logger.log("Searching for byte 0x0A in the binary file...");
 
     for (let i = 0; i < data.length; i++) {
-      if (data[i] === 0x0A & data[i + 4] > 0x00) {
+      if (data[i] === 0x0A && data[i + 4] > 0x00) {
         logger.log("Found 0x0A at index:", i, "with patch count:", data[i + 3] + data[i + 4]);
-        locations.push(i);
+        if ((data[i + 3] + data[i + 4]) === 2 || (data[i + 3] + data[i + 4]) === 4
+          || (data[i + 3] + data[i + 4]) === 6 || (data[i + 3] + data[i + 4]) === 8) {
+          locations.push(i);
+          break;
+        }
       }
     }
     return locations.length === 0 ? -1 : locations;
   }
+
   static isMultipleOf8(hexValue) {
     const num = parseInt(hexValue, 16);
     return num % 8 === 0;
@@ -168,7 +173,11 @@ class PatchService {
 
   static toBigEndian(hexString) {
     const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
-    return cleanHex.match(/.{2}/g).reverse().join("");
+    const matches = cleanHex.match(/.{2}/g);
+    if (!matches) {
+      throw new Error("Invalid or empty hex string for big-endian conversion");
+    }
+    return matches.reverse().join("");
   }
 
   static async buildJsonFromFile(filePath, originalname) {
@@ -177,7 +186,6 @@ class PatchService {
       const patches = PatchService.extractPatches(data);
       let cmdCount = 0;
       const jsonOcurrences = [];
-      const jsonContent = [];
       const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
       const formattedHash = this.formatHash(hashGameCode);
 
@@ -205,9 +213,16 @@ class PatchService {
           jsonOcurrences.push({
             GameTitle: originalname,
             HashGameCode: formattedHash,
-            Occurrence: occurrence,
-            PatchesLittleEndian: patchData.LittleEndian,
-            PatchesBigEndian: patchData.BigEndian
+            Infos: {
+              Values: {
+                Occurrences: `${cmdCount} -> (0x0A) --> (0x2C)`,
+                Patches: {
+                  Offset: patch.offset,
+                  OriginalOpcode: patch.originalOpcode,
+                  ReplaceOpcode: patch.replaceOpcode
+                }
+              }
+            }
           })
         });
       });
