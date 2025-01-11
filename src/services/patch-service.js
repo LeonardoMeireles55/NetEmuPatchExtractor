@@ -163,11 +163,11 @@ class PatchService {
   static async getHashByGameIDOrAlt(gameID, altGameID) {
     const slicedGameID = gameID.slice(0, -7);
     const slicedAltGameID = altGameID.slice(0, -7);
-    console.log("Sliced Game ID ->>>>> ", slicedGameID);
 
     const hash = await findHashByGameID(slicedGameID, slicedAltGameID);
-    console.log("Hash ->>>>> ", hash);
-
+    if (!hash) {
+      throw new Error("Game not found in the database");
+    }
     return hash;
   }
 
@@ -239,9 +239,6 @@ class PatchService {
     const outputFilePathHex = path.resolve(__dirname, '/tmp/', outputFileName);
 
     const originalOutputFilePath = path.resolve(__dirname, '/tmp/', originalname) + ".zip";
-
-
-    console.log(originalname);
 
     fs.readFile(inputFileName, async (err, data) => {
       if (err) {
