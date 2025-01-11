@@ -13,7 +13,14 @@ const { createTableAndInsertBatches, findHashByGameID, ensureTableExists, dropTa
 const app = express();
 const port = 3000;
 
-const upload = multer({ dest: '/tmp' });
+const storage = multer.diskStorage({
+  destination: '/tmp',
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  }
+});
+
+const upload = multer({ storage: storage });
 
 app.use(express.json());
 app.use(cors());
@@ -72,7 +79,7 @@ cron.schedule('*/3 * * * *', () => {
 
   console.log('Cron job running every minute');
   PatchService.deleteOldFiles();
-  
+
 });
 
 // async function getFileFromTmp(fileName) {
