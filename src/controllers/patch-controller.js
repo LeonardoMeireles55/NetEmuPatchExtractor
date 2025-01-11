@@ -7,8 +7,6 @@ const PatchController = {
   async getFileFromTmp(req, res) {
     const fileName = req.params.fileName;
 
-    console.log(fileName);
-
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
@@ -58,9 +56,34 @@ const PatchController = {
     }
   },
 
+  async generateJsonResponse(req, res) {
+
+    const filePath = req.file.path;
+    const name = req.file.originalname;
+
+    const originalName = `${name}`.replace('.CONFIG', '');
+
+    if (!name) {
+      return res.status(400).json({ error: 'File name is required' });
+    }
+
+    try {
+      const originalName = name.replace('.CONFIG', '');
+      const json = await PatchService.returnJsonOfConfigs(filePath, originalName);
+      return res.status(200).json(json);
+    } catch (error) {
+      console.error('Error building JSON:', error.message);
+      return res.status(500).json({ error: 'Error building JSON' });
+    }
+  },
+
   async processHexFile(req, res) {
     if (!req.file) {
       return res.status(400).json({ error: 'Hex file is required' });
+    }
+
+    if (!req.file.originalname.endsWith('.CONFIG')) {
+      return res.status(400).json({ error: 'File must end with .CONFIG extension' });
     }
 
     const filePath = req.file.path;

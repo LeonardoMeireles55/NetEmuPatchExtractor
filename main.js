@@ -52,8 +52,23 @@ app.get('/download/:fileName', async (req, res) => {
   }
 });
 
-app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
+app.post('/process-hex', upload.single('file'), async (req, res) => {
+  try {
+    await PatchController.processHexFile(req, res);
+  } catch (error) {
+    console.error('Error processing hex file:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
 
+app.post('/process-hex-json', upload.single('file'), async (req, res) => {
+  try {
+    await PatchController.generateJsonResponse(req, res);
+  } catch (error) {
+    console.error('Error generating JSON response:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
 
 (async () => {
   try {
@@ -75,13 +90,10 @@ app.post('/process-hex', upload.single('file'), PatchController.processHexFile);
   }
 })();
 
-cron.schedule('*/3 * * * *', () => {
-
-  console.log('Cron job running every minute');
+cron.schedule('*/5 * * * *', () => {
+  console.log('Cron job running every 5 minutes');
   PatchService.deleteOldFiles();
-
 });
-
 // async function getFileFromTmp(fileName) {
 //   const tmpFilePath = path.join('/tmp', fileName);
 //   try {
