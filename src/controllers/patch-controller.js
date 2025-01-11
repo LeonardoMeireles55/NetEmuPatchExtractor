@@ -7,6 +7,8 @@ const PatchController = {
   async getFileFromTmp(req, res) {
     const fileName = req.params.fileName;
 
+    console.log(fileName);
+
     if (!fileName) {
       return res.status(400).json({ error: 'File name not provided' });
     }
@@ -18,7 +20,7 @@ const PatchController = {
         let isReady = false;
         let attempts = 0;
 
-        while (!isReady && attempts < 10) {
+        while (!isReady && attempts < 15) {
           try {
             await fs.access(tmpFilePath);
 
@@ -61,20 +63,15 @@ const PatchController = {
       return res.status(400).json({ error: 'Hex file is required' });
     }
 
-
     const filePath = req.file.path;
-    const originalName = req.file.originalname;
-    const outputFileName = `${originalName}`.replace('.hex', '.txt', '.config');
+    const name = req.file.originalname;
+
+    const originalName = `${name}`.replace('.CONFIG', '');
 
     console.log(`Processing hex file: ${originalName}`);
 
     try {
-      const data = await PatchService.processFile(filePath, outputFileName, originalName);
-      const json = await PatchService.buildJsonFromFile(filePath, outputFileName);
-
-      json.forEach((element) => {
-        console.log(element.Infos);
-      });
+      await PatchService.processFile(filePath, originalName);
 
       return res.status(200).json({
         message: 'Hex file processing completed.',
@@ -85,7 +82,7 @@ const PatchController = {
       console.error('Error processing hex file:', error.message);
       return res.status(500).json({ error: 'Error processing hex file' });
     }
-  }
+  },
 };
 
 module.exports = PatchController;
