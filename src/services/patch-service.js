@@ -3,7 +3,7 @@ const AdmZip = require('adm-zip');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log');
-const { findHashByGameID } = require('../database/sqlite3-db.js');
+const { findHashByGameID, findNameHashByGameID } = require('../database/sqlite3-db.js');
 const { runPs2ConfigCmd } = require('../utils/ps2-config');
 
 class PatchService {
@@ -25,9 +25,6 @@ class PatchService {
   }
 
   static async getHashByGameIDOrAlt(gameID, altGameID) {
-    // const slicedGameID = gameID.slice(0, -7);
-    // const slicedAltGameID = altGameID.slice(0, -7);
-
     logger.log("Searching for hash in the database...");
     logger.log("Game ID:", gameID, "Alt Game ID:", altGameID);
 
@@ -35,17 +32,215 @@ class PatchService {
     if (!hash) {
       new Error("Game not found in the database");
     }
-    return hash;
+
+    const name = await findNameHashByGameID(gameID, altGameID);
+    if (!name) {
+      new Error("Game not found in the database");
+    }
+
+    return { hash, name };
   }
 
 
   static toBigEndian(hexString) {
     const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
-    const matches = cleanHex.match(/.{2}/g);
-    if (!matches) {
-      throw new Error("Invalid or empty hex string for big-endian conversion");
+    const buffer = Buffer.from(cleanHex, 'hex');
+    buffer.reverse();
+    return buffer;
+  }
+
+  static parseParamsForCommand(cmd, data, offset) {
+
+    switch (cmd) {
+
+      case 0x13: {
+        const requiredBytes = offset + 12; // 4 (cmd) + 8 (uint64_t)
+        if (requiredBytes > data.length) {
+          logger.error("Insufficient data for command 0x13");
+          return null;
+        }
+
+        const rawParam = data.readBigUInt64LE(offset + 4);
+        const param = `0x${rawParam.toString(16).toUpperCase().padStart(16, '0')}`;
+
+        return { param };
+      }
+
+      case 0x0C: {
+        const rawParam1 = data[offset + 4] | (data[offset + 5] << 8);
+        const rawParam2 = data[offset + 6] | (data[offset + 7] << 8);
+        const param1 = `0x${rawParam1.toString(16).toUpperCase().padStart(4, '0')}`;
+        const param2 = `0x${rawParam2.toString(16).toUpperCase().padStart(4, '0')}`;
+        return { param1, param2 };
+      }
+
+
+
+      case 0x0A: {
+        const count = data.readUInt32LE(offset + 4);
+        const items = [];
+
+        for (let i = 0; i < count; i++) {
+          const entryOffset = offset + 8 + i * 12;
+          if (entryOffset + 12 > data.length) {
+            break;
+          }
+
+          const modeOffset = data.readUInt32LE(entryOffset);
+          const mode = (modeOffset >> 28) & 0xF;
+          const eeOffset = modeOffset & 0x0FFFFFFF;
+          const originalOpcode = data.readUInt32LE(entryOffset + 4);
+          const replaceOpcode = data.readUInt32LE(entryOffset + 8);
+
+          items.push({
+            // mode: `0x${mode.toString(16).toUpperCase().padStart(1, '0')}`,
+            offset: `0x${eeOffset.toString(16).toUpperCase().padStart(8, '0')}`,
+            originalOpcode: `0x${originalOpcode.toString(16).toUpperCase().padStart(8, '0')}`,
+            replaceOpcode: `0x${replaceOpcode.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { values: items };
+      }
+
+      case 0x0D: {
+        const rawValue = data.readInt32LE
+          ? data.readInt32LE(offset + 4)
+          : (data[offset + 4] |
+            (data[offset + 5] << 8) |
+            (data[offset + 6] << 16) |
+            (data[offset + 7] << 24));
+        const value = `0x${rawValue.toString(16).toUpperCase().padStart(8, '0')}`;
+        return { value };
+      }
+
+      case 0x0E: {
+        const rawParam = data.readInt32LE
+          ? data.readInt32LE(offset + 4)
+          : (data[offset + 4] |
+            (data[offset + 5] << 8) |
+            (data[offset + 6] << 16) |
+            (data[offset + 7] << 24));
+        const param = `0x${rawParam.toString(16).toUpperCase().padStart(8, '0')}`;
+        return { param };
+      }
+
+      case 0x21: {
+        const rawValue = data.readUInt32LE(offset + 4);
+        const option1 = (rawValue & 0x1).toString(16).toUpperCase().padStart(2, '0');
+        const option2 = ((rawValue >> 1) & 0x1).toString(16).toUpperCase().padStart(2, '0');
+        return {
+          option1: `0x${option1}`,
+          option2: `0x${option2}`
+        };
+      }
+
+      case 0x0F: {
+        const items = [];
+        const offsetPatch = offset + 4;
+        for (let i = 0; i < data.length; i += 4) {
+          const entryOffset = offsetPatch + i;
+          if (data[entryOffset + 4] && data[entryOffset + 8] == 0) {
+            break;
+          }
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+
+          items.push(
+            `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          );
+        }
+
+        return { args: items };
+      }
+
+      case 0x26: {
+        const count = data.readUInt32LE(offset + 4);
+        const limitedCount = Math.min(count, 32);
+        const items = [];
+
+        for (let i = 0; i < limitedCount; i++) {
+          const entryOffset = offset + 8 + i * 8;
+          if (entryOffset + 8 > data.length) {
+            break;
+          }
+
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+          items.push({
+            param1: `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            param2: `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+      }
+
+      case 0x27: {
+        const count = data.readUInt32LE(offset + 4);
+        const limitedCount = Math.min(count, 32);
+        const items = [];
+
+        for (let i = 0; i < limitedCount; i++) {
+          const entryOffset = offset + 8 + i * 8;
+          if (entryOffset + 8 > data.length) {
+            break;
+          }
+
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+          items.push({
+            param1: `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            param2: `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+      }
+
+      default:
+        return { empty: '-' };
     }
-    return matches.reverse().join("");
+  }
+
+
+  static findAllCommandLocalizations(data) {
+    const commandList = [
+      0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10,
+      0x11, 0x13, 0x15, 0x19, 0x21, 0x26, 0x27, 0x2F,
+      0x46, 0x47, 0x48, 0x50
+    ];
+    const results = [];
+
+    for (const cmd of commandList) {
+      const positions = [];
+      for (let i = 0; i < data.length - 3; i++) {
+        if (
+          data[i - 1] === 0x00 &&
+          data[i] === cmd &&
+          data[i + 1] === 0x00 &&
+          data[i + 2] === 0x00 &&
+          data[i + 3] === 0x00
+        ) {
+          positions.push(i);
+        }
+      }
+      if (positions.length) {
+        const commandHex = `0x${cmd.toString(16).padStart(2, '0').toUpperCase()}`;
+        const infos = positions.map(pos => ({
+          foundOnOffSet: `0x${pos.toString(16).padStart(2, '0').toUpperCase()}`,
+          args: this.parseParamsForCommand(cmd, data, pos)
+        }));
+
+        results.push({ command: commandHex, infos });
+      }
+    }
+
+    return results;
   }
 
   static findCommandLocalization(data) {
@@ -64,54 +259,15 @@ class PatchService {
     return locations.length === 0 ? -1 : locations;
   }
 
-  static async returnJsonOfConfigs(filePath, originalname) {
+  static async returnJsonOfConfigs(filePath, id) {
+
     try {
       const data = await fs.promises.readFile(filePath);
-      const patches = this.extractPatches(data);
-      let cmdCount = 0;
-      const jsonOcurrences = [];
-      const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
-      const formattedHash = this.formatHash(hashGameCode);
+      const patches = PatchService.findAllCommandLocalizations(data);
+      const hashName = await this.getHashByGameIDOrAlt(id, id);
+      const gameID = `${id} - ${hashName.name}`;
 
-      patches.forEach((occurrence, index) => {
-        occurrence.patches.forEach((patch) => {
-          cmdCount++;
-          if (cmdCount > 31) return;
-
-          const bigEndianOffset = PatchService.toBigEndian(patch.offset);
-          const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
-          const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
-          const patchData = {
-            LittleEndian: {
-              Offset: patch.offset,
-              OriginalOpcode: patch.originalOpcode,
-              ReplaceOpcode: patch.replaceOpcode
-            },
-            BigEndian: {
-              Offset: bigEndianOffset,
-              OriginalOpcode: bigEndianOriginalOpcode,
-              ReplaceOpcode: bigEndianReplaceOpcode
-            }
-          };
-
-          jsonOcurrences.push({
-            GameTitle: originalname,
-            HashGameCode: formattedHash,
-            Infos: {
-              Values: {
-                Occurrences: `${cmdCount} -> (0x0A) --> (0x2C)`,
-                Patches: {
-                  Offset: patch.offset,
-                  OriginalOpcode: patch.originalOpcode,
-                  ReplaceOpcode: patch.replaceOpcode
-                }
-              }
-            }
-          })
-        });
-      });
-
-      return jsonOcurrences;
+      return { gameID, patches };
     } catch (error) {
       logger.error("Error building JSON:", error.message);
       throw error;
@@ -225,68 +381,28 @@ class PatchService {
     const configName = originalname.replace('.CONFIG', '');
     const outputFilePath = path.resolve(__dirname, '/tmp', configName);
 
+    try {
+      const data = await fs.promises.readFile(inputFileName);
+      const hashName = await this.getHashByGameIDOrAlt(configName, configName);
 
-    fs.readFile(inputFileName, async (err, data) => {
-      if (err) {
-        logger.error("Error reading the binary file:", err.message);
-        return;
-      }
+      const hashGameCode = this.formatHash(hashName.hash) + ' --- ' + hashName.name;
+      const patches = PatchService.findAllCommandLocalizations(data);
 
-      const hashGameCode = this.formatHash(await this.getHashByGameIDOrAlt(originalname, originalname));
-
-      const patches = PatchService.extractPatches(data);
-      let cmdCount = 0;
-      let netEmuToPnach = [];
       let outputLines = [`Extracted Patches: ${originalname} ---- Hash:  ${hashGameCode}\n\n`];
-
-
-
-      patches.forEach((occurrence, index) => {
-        outputLines.push(`${occurrence.occurrence}:\n\n`);
-
-        occurrence.patches.forEach((patch, patchIndex) => {
-          cmdCount++;
-          if (cmdCount > 31) {
-            return;
-          }
-          const bigEndianOffset = PatchService.toBigEndian(patch.offset);
-          const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
-          const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
-
-          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD: bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
-
-          outputLines.push(
-            `  Patch: ${patchIndex + 1}\n` +
-            `    Little Endian:\n` +
-            `    Offset: ${patch.offset}\n` +
-            `    Original Opcode: ${patch.originalOpcode}\n` +
-            `    Replace Opcode: ${patch.replaceOpcode}\n\n` +
-            `    Big Endian:\n` +
-            `    Offset: ${bigEndianOffset}\n` +
-            `    Original Opcode: ${bigEndianOriginalOpcode}\n` +
-            `    Replace Opcode: ${bigEndianReplaceOpcode}\n\n`
-          );
-          outputLines.push('------------------------------------\n\n');
-        });
-      });
+      outputLines.push(JSON.stringify(patches, null, 2));
 
       let outputContent = outputLines.join('');
       let outputFilePathText = path.resolve(__dirname, '/tmp/', originalname) + ".txt";
 
-      // fs.writeFile(outputFilePathText, outputContent, 'latin1', (writeErr) => {
-      //   if (writeErr) {
-      //     logger.error("Error saving the file:", writeErr.message);
-      //     return;
-      //   }
-      //   logger.log(`Extracted patches saved to: ${outputFileName}`);
-      // });
-
       runPs2ConfigCmd();
-      const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
 
+      const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
       return zipFile;
 
-    });
+    } catch (err) {
+      logger.error("Error reading the binary file:", err.message);
+      throw err;
+    }
   }
 
 

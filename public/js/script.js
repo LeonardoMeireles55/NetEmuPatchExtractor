@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const jsonConfigs = await jsonConfigResponse.json();
 
             setTimeout(() => {
-                logOutput.textContent = `Success: ${data.message}\nConfigs: ${JSON.stringify(jsonConfigs, null, 2)}`;
+                logOutput.textContent = `Success: ${data.message}\n GameID:${jsonConfigs.gameID}\n Configs: ${JSON.stringify(jsonConfigs.patches, null, 2)}`;
 
             }, 1000);
 

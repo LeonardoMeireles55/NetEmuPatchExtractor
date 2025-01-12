@@ -75,6 +75,20 @@ async function createTableAndInsertBatches(filePath) {
   }
 }
 
+async function findNameHashByGameID(gameID, altGameID) {
+  const db = await getDatabaseConnection();
+  const sql = `SELECT name, hash FROM games WHERE gameID = ? OR altGameID = ? LIMIT 1`;
+
+  try {
+    const row = await db.get(sql, [gameID, altGameID]);
+    return row?.name || null;
+  } catch (err) {
+    throw new Error('Error: ' + err);
+  } finally {
+    await db.close();
+  }
+}
+
 async function findHashByGameID(gameID, altGameID) {
   const db = await getDatabaseConnection();
   const sql = `SELECT hash FROM games WHERE gameID = ? OR altGameID = ? LIMIT 1`;
@@ -92,7 +106,9 @@ async function findHashByGameID(gameID, altGameID) {
 module.exports = {
   createTableAndInsertBatches,
   findHashByGameID,
+  findNameHashByGameID,
   ensureTableExists,
   getDatabaseConnection,
   dropTable,
+
 };
