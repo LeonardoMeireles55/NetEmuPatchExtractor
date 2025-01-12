@@ -3,7 +3,7 @@ const AdmZip = require('adm-zip');
 const path = require('path');
 const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log');
-const { findHashByGameID } = require('../database/sqlite3-db.js');
+const { findHashByGameID, findNameHashByGameID } = require('../database/sqlite3-db.js');
 const { runPs2ConfigCmd } = require('../utils/ps2-config');
 
 class PatchService {
@@ -32,7 +32,13 @@ class PatchService {
     if (!hash) {
       new Error("Game not found in the database");
     }
-    return hash;
+
+    const name = await findNameHashByGameID(gameID, altGameID);
+    if (!name) {
+      new Error("Game not found in the database");
+    }
+
+    return { hash, name };
   }
 
 
@@ -44,9 +50,22 @@ class PatchService {
   }
 
   static parseParamsForCommand(cmd, data, offset) {
-    // Basic examples for certain commands, expand as needed:
+
     switch (cmd) {
-      // 0x0C => Unknown, uses two uint16 params
+
+      case 0x13: {
+        const requiredBytes = offset + 12; // 4 (cmd) + 8 (uint64_t)
+        if (requiredBytes > data.length) {
+          logger.error("Insufficient data for command 0x13");
+          return null;
+        }
+
+        const rawParam = data.readBigUInt64LE(offset + 4);
+        const param = `0x${rawParam.toString(16).toUpperCase().padStart(16, '0')}`;
+
+        return { param };
+      }
+
       case 0x0C: {
         const rawParam1 = data[offset + 4] | (data[offset + 5] << 8);
         const rawParam2 = data[offset + 6] | (data[offset + 7] << 8);
@@ -55,7 +74,8 @@ class PatchService {
         return { param1, param2 };
       }
 
-      // 0x0A => EE_INSN_REPLACE32
+
+
       case 0x0A: {
         const count = data.readUInt32LE(offset + 4);
         const items = [];
@@ -73,17 +93,16 @@ class PatchService {
           const replaceOpcode = data.readUInt32LE(entryOffset + 8);
 
           items.push({
-            mode: `0x${mode.toString(16).toUpperCase().padStart(1, '0')}`,
+            // mode: `0x${mode.toString(16).toUpperCase().padStart(1, '0')}`,
             offset: `0x${eeOffset.toString(16).toUpperCase().padStart(8, '0')}`,
             originalOpcode: `0x${originalOpcode.toString(16).toUpperCase().padStart(8, '0')}`,
             replaceOpcode: `0x${replaceOpcode.toString(16).toUpperCase().padStart(8, '0')}`
           });
         }
 
-        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+        return { values: items };
       }
 
-      // 0x0D => Unknown, uses one int32
       case 0x0D: {
         const rawValue = data.readInt32LE
           ? data.readInt32LE(offset + 4)
@@ -95,7 +114,6 @@ class PatchService {
         return { value };
       }
 
-      // 0x0E => Improves ADD/SUB accuracy, 1 int32 param (in hex)
       case 0x0E: {
         const rawParam = data.readInt32LE
           ? data.readInt32LE(offset + 4)
@@ -107,18 +125,16 @@ class PatchService {
         return { param };
       }
 
-      // 0x21 => Unknown
       case 0x21: {
         const rawValue = data.readUInt32LE(offset + 4);
-        const option1 = (rawValue & 0x1).toString(16).toUpperCase().padStart(1, '0');
-        const option2 = ((rawValue >> 1) & 0x1).toString(16).toUpperCase().padStart(1, '0');
+        const option1 = (rawValue & 0x1).toString(16).toUpperCase().padStart(2, '0');
+        const option2 = ((rawValue >> 1) & 0x1).toString(16).toUpperCase().padStart(2, '0');
         return {
           option1: `0x${option1}`,
           option2: `0x${option2}`
         };
       }
 
-      // 0x0F => More accurate ADD/SUB memory range
       case 0x0F: {
         const items = [];
         const offsetPatch = offset + 4;
@@ -140,15 +156,61 @@ class PatchService {
         return { args: items };
       }
 
+      case 0x26: {
+        const count = data.readUInt32LE(offset + 4);
+        const limitedCount = Math.min(count, 32);
+        const items = [];
+
+        for (let i = 0; i < limitedCount; i++) {
+          const entryOffset = offset + 8 + i * 8;
+          if (entryOffset + 8 > data.length) {
+            break;
+          }
+
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+          items.push({
+            param1: `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            param2: `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+      }
+
+      case 0x27: {
+        const count = data.readUInt32LE(offset + 4);
+        const limitedCount = Math.min(count, 32);
+        const items = [];
+
+        for (let i = 0; i < limitedCount; i++) {
+          const entryOffset = offset + 8 + i * 8;
+          if (entryOffset + 8 > data.length) {
+            break;
+          }
+
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+          items.push({
+            param1: `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            param2: `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+      }
+
       default:
-        return null;
+        return { empty: '-' };
     }
   }
 
 
   static findAllCommandLocalizations(data) {
     const commandList = [
-      0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+      0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10,
       0x11, 0x13, 0x15, 0x19, 0x21, 0x26, 0x27, 0x2F,
       0x46, 0x47, 0x48, 0x50
     ];
@@ -157,7 +219,6 @@ class PatchService {
     for (const cmd of commandList) {
       const positions = [];
       for (let i = 0; i < data.length - 3; i++) {
-        // Check if command is followed by 0x00 0x00 0x00
         if (
           data[i - 1] === 0x00 &&
           data[i] === cmd &&
@@ -171,8 +232,8 @@ class PatchService {
       if (positions.length) {
         const commandHex = `0x${cmd.toString(16).padStart(2, '0').toUpperCase()}`;
         const infos = positions.map(pos => ({
-          offset: pos.toString(16).padStart(2, '0').toUpperCase(),
-          params: this.parseParamsForCommand(cmd, data, pos)
+          foundOnOffSet: `0x${pos.toString(16).padStart(2, '0').toUpperCase()}`,
+          args: this.parseParamsForCommand(cmd, data, pos)
         }));
 
         results.push({ command: commandHex, infos });
@@ -198,38 +259,15 @@ class PatchService {
     return locations.length === 0 ? -1 : locations;
   }
 
-  static async returnJsonOfConfigs(filePath, originalname) {
+  static async returnJsonOfConfigs(filePath, id) {
+
     try {
       const data = await fs.promises.readFile(filePath);
-      const patches = this.extractPatches(data);
-      let cmdCount = 0;
-      const jsonOcurrences = [];
-      const hashGameCode = await this.getHashByGameIDOrAlt(originalname, originalname);
-      const formattedHash = this.formatHash(hashGameCode);
+      const patches = PatchService.findAllCommandLocalizations(data);
+      const hashName = await this.getHashByGameIDOrAlt(id, id);
+      const gameID = `${id} - ${hashName.name}`;
 
-      patches.forEach((occurrence, index) => {
-        occurrence.patches.forEach((patch) => {
-          cmdCount++;
-          if (cmdCount > 16) return;
-
-          jsonOcurrences.push({
-            GameTitle: originalname,
-            HashGameCode: formattedHash,
-            Infos: {
-              Values: {
-                Occurrences: `${cmdCount} -> (0x0A) --> (0x2C)`,
-                Patches: {
-                  Offset: patch.offset,
-                  OriginalOpcode: patch.originalOpcode,
-                  ReplaceOpcode: patch.replaceOpcode
-                }
-              }
-            }
-          })
-        });
-      });
-
-      return jsonOcurrences;
+      return { gameID, patches };
     } catch (error) {
       logger.error("Error building JSON:", error.message);
       throw error;
@@ -239,10 +277,6 @@ class PatchService {
 
   static extractPatches(data) {
     const locations = PatchService.findCommandLocalization(data);
-    const test = PatchService.findAllCommandLocalizations(data);
-    test.forEach((element) => {
-      logger.info(JSON.stringify(element, null, 2));
-    });
     if (locations === -1) {
       logger.log("No occurrences of byte 0x0A found.");
       return [];
@@ -301,24 +335,24 @@ class PatchService {
       // Delay for file system sync
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // // Check if both files exist
-      // const hexExists = await fs.promises.access(originalOutputFilePath)
-      //   .then(() => true)
-      //   .catch(() => false);
+      // Check if both files exist
+      const hexExists = await fs.promises.access(originalOutputFilePath)
+        .then(() => true)
+        .catch(() => false);
 
       const textExists = await fs.promises.access(outputFilePathText)
         .then(() => true)
         .catch(() => false);
 
-      // if (!textExists || !hexExists) {
-      //   throw new Error('One or more files missing before zip creation');
-      // }
+      if (!textExists || !hexExists) {
+        throw new Error('One or more files missing before zip creation');
+      }
 
       // Create zip
       const zip = new AdmZip();
 
       // Add files with proper names
-      // zip.addLocalFile(originalOutputFilePath, '', path.basename(originalOutputFilePath));
+      zip.addLocalFile(originalOutputFilePath, '', path.basename(originalOutputFilePath));
       zip.addLocalFile(outputFilePathText, '', path.basename(outputFilePathText));
 
       // Write zip with promise wrapper
@@ -349,45 +383,18 @@ class PatchService {
 
     try {
       const data = await fs.promises.readFile(inputFileName);
+      const hashName = await this.getHashByGameIDOrAlt(configName, configName);
 
-      const hashGameCode = this.formatHash(await this.getHashByGameIDOrAlt(originalname, originalname));
-      const patches = PatchService.extractPatches(data);
-      let cmdCount = 0;
-      let netEmuToPnach = [];
+      const hashGameCode = this.formatHash(hashName.hash) + ' --- ' + hashName.name;
+      const patches = PatchService.findAllCommandLocalizations(data);
+
       let outputLines = [`Extracted Patches: ${originalname} ---- Hash:  ${hashGameCode}\n\n`];
-
-      patches.forEach((occurrence, index) => {
-        outputLines.push(`${occurrence.occurrence}:\n\n`);
-        occurrence.patches.forEach((patch, patchIndex) => {
-          cmdCount++;
-          if (cmdCount > 31) {
-            return;
-          }
-          const bigEndianOffset = PatchService.toBigEndian(patch.offset);
-          const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
-          const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
-
-          netEmuToPnach.push({ EE: bigEndianOffset, OriginalWORD: bigEndianOriginalOpcode, WORD: bigEndianReplaceOpcode });
-
-          outputLines.push(
-            `  Patch: ${patchIndex + 1}\n` +
-            `    Little Endian:\n` +
-            `    Offset: ${patch.offset}\n` +
-            `    Original Opcode: ${patch.originalOpcode}\n` +
-            `    Replace Opcode: ${patch.replaceOpcode}\n\n` +
-            `    Big Endian:\n` +
-            `    Offset: ${bigEndianOffset}\n` +
-            `    Original Opcode: ${bigEndianOriginalOpcode}\n` +
-            `    Replace Opcode: ${bigEndianReplaceOpcode}\n\n`
-          );
-          outputLines.push('------------------------------------\n\n');
-        });
-      });
+      outputLines.push(JSON.stringify(patches, null, 2));
 
       let outputContent = outputLines.join('');
       let outputFilePathText = path.resolve(__dirname, '/tmp/', originalname) + ".txt";
 
-      // runPs2ConfigCmd();
+      runPs2ConfigCmd();
 
       const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
       return zipFile;
