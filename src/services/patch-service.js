@@ -38,11 +38,148 @@ class PatchService {
 
   static toBigEndian(hexString) {
     const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
-    const matches = cleanHex.match(/.{2}/g);
-    if (!matches) {
-      throw new Error("Invalid or empty hex string for big-endian conversion");
+    const buffer = Buffer.from(cleanHex, 'hex');
+    buffer.reverse();
+    return buffer;
+  }
+
+  static parseParamsForCommand(cmd, data, offset) {
+    // Basic examples for certain commands, expand as needed:
+    switch (cmd) {
+      // 0x0C => Unknown, uses two uint16 params
+      case 0x0C: {
+        const rawParam1 = data[offset + 4] | (data[offset + 5] << 8);
+        const rawParam2 = data[offset + 6] | (data[offset + 7] << 8);
+        const param1 = `0x${rawParam1.toString(16).toUpperCase().padStart(4, '0')}`;
+        const param2 = `0x${rawParam2.toString(16).toUpperCase().padStart(4, '0')}`;
+        return { param1, param2 };
+      }
+
+      // 0x0A => EE_INSN_REPLACE32
+      case 0x0A: {
+        const count = data.readUInt32LE(offset + 4);
+        const items = [];
+
+        for (let i = 0; i < count; i++) {
+          const entryOffset = offset + 8 + i * 12;
+          if (entryOffset + 12 > data.length) {
+            break;
+          }
+
+          const modeOffset = data.readUInt32LE(entryOffset);
+          const mode = (modeOffset >> 28) & 0xF;
+          const eeOffset = modeOffset & 0x0FFFFFFF;
+          const originalOpcode = data.readUInt32LE(entryOffset + 4);
+          const replaceOpcode = data.readUInt32LE(entryOffset + 8);
+
+          items.push({
+            mode: `0x${mode.toString(16).toUpperCase().padStart(1, '0')}`,
+            offset: `0x${eeOffset.toString(16).toUpperCase().padStart(8, '0')}`,
+            originalOpcode: `0x${originalOpcode.toString(16).toUpperCase().padStart(8, '0')}`,
+            replaceOpcode: `0x${replaceOpcode.toString(16).toUpperCase().padStart(8, '0')}`
+          });
+        }
+
+        return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
+      }
+
+      // 0x0D => Unknown, uses one int32
+      case 0x0D: {
+        const rawValue = data.readInt32LE
+          ? data.readInt32LE(offset + 4)
+          : (data[offset + 4] |
+            (data[offset + 5] << 8) |
+            (data[offset + 6] << 16) |
+            (data[offset + 7] << 24));
+        const value = `0x${rawValue.toString(16).toUpperCase().padStart(8, '0')}`;
+        return { value };
+      }
+
+      // 0x0E => Improves ADD/SUB accuracy, 1 int32 param (in hex)
+      case 0x0E: {
+        const rawParam = data.readInt32LE
+          ? data.readInt32LE(offset + 4)
+          : (data[offset + 4] |
+            (data[offset + 5] << 8) |
+            (data[offset + 6] << 16) |
+            (data[offset + 7] << 24));
+        const param = `0x${rawParam.toString(16).toUpperCase().padStart(8, '0')}`;
+        return { param };
+      }
+
+      // 0x21 => Unknown
+      case 0x21: {
+        const rawValue = data.readUInt32LE(offset + 4);
+        const option1 = (rawValue & 0x1).toString(16).toUpperCase().padStart(1, '0');
+        const option2 = ((rawValue >> 1) & 0x1).toString(16).toUpperCase().padStart(1, '0');
+        return {
+          option1: `0x${option1}`,
+          option2: `0x${option2}`
+        };
+      }
+
+      // 0x0F => More accurate ADD/SUB memory range
+      case 0x0F: {
+        const items = [];
+        const offsetPatch = offset + 4;
+        for (let i = 0; i < data.length; i += 4) {
+          const entryOffset = offsetPatch + i;
+          if (data[entryOffset + 4] && data[entryOffset + 8] == 0) {
+            break;
+          }
+          const param1 = data.readUInt32LE(entryOffset);
+          const param2 = data.readUInt32LE(entryOffset + 4);
+
+
+          items.push(
+            `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
+            `0x${param2.toString(16).toUpperCase().padStart(8, '0')}`
+          );
+        }
+
+        return { args: items };
+      }
+
+      default:
+        return null;
     }
-    return matches.reverse().join("");
+  }
+
+
+  static findAllCommandLocalizations(data) {
+    const commandList = [
+      0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+      0x11, 0x13, 0x15, 0x19, 0x21, 0x26, 0x27, 0x2F,
+      0x46, 0x47, 0x48, 0x50
+    ];
+    const results = [];
+
+    for (const cmd of commandList) {
+      const positions = [];
+      for (let i = 0; i < data.length - 3; i++) {
+        // Check if command is followed by 0x00 0x00 0x00
+        if (
+          data[i - 1] === 0x00 &&
+          data[i] === cmd &&
+          data[i + 1] === 0x00 &&
+          data[i + 2] === 0x00 &&
+          data[i + 3] === 0x00
+        ) {
+          positions.push(i);
+        }
+      }
+      if (positions.length) {
+        const commandHex = `0x${cmd.toString(16).padStart(2, '0').toUpperCase()}`;
+        const infos = positions.map(pos => ({
+          offset: pos.toString(16).padStart(2, '0').toUpperCase(),
+          params: this.parseParamsForCommand(cmd, data, pos)
+        }));
+
+        results.push({ command: commandHex, infos });
+      }
+    }
+
+    return results;
   }
 
   static findCommandLocalization(data) {
@@ -102,6 +239,10 @@ class PatchService {
 
   static extractPatches(data) {
     const locations = PatchService.findCommandLocalization(data);
+    const test = PatchService.findAllCommandLocalizations(data);
+    test.forEach((element) => {
+      logger.info(JSON.stringify(element, null, 2));
+    });
     if (locations === -1) {
       logger.log("No occurrences of byte 0x0A found.");
       return [];
@@ -160,24 +301,24 @@ class PatchService {
       // Delay for file system sync
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Check if both files exist
-      const hexExists = await fs.promises.access(originalOutputFilePath)
-        .then(() => true)
-        .catch(() => false);
+      // // Check if both files exist
+      // const hexExists = await fs.promises.access(originalOutputFilePath)
+      //   .then(() => true)
+      //   .catch(() => false);
 
       const textExists = await fs.promises.access(outputFilePathText)
         .then(() => true)
         .catch(() => false);
 
-      if (!textExists || !hexExists) {
-        throw new Error('One or more files missing before zip creation');
-      }
+      // if (!textExists || !hexExists) {
+      //   throw new Error('One or more files missing before zip creation');
+      // }
 
       // Create zip
       const zip = new AdmZip();
 
       // Add files with proper names
-      zip.addLocalFile(originalOutputFilePath, '', path.basename(originalOutputFilePath));
+      // zip.addLocalFile(originalOutputFilePath, '', path.basename(originalOutputFilePath));
       zip.addLocalFile(outputFilePathText, '', path.basename(outputFilePathText));
 
       // Write zip with promise wrapper
@@ -246,7 +387,8 @@ class PatchService {
       let outputContent = outputLines.join('');
       let outputFilePathText = path.resolve(__dirname, '/tmp/', originalname) + ".txt";
 
-      runPs2ConfigCmd();
+      // runPs2ConfigCmd();
+
       const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
       return zipFile;
 
