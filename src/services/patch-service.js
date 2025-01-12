@@ -225,25 +225,17 @@ class PatchService {
     const configName = originalname.replace('.CONFIG', '');
     const outputFilePath = path.resolve(__dirname, '/tmp', configName);
 
-
-    fs.readFile(inputFileName, async (err, data) => {
-      if (err) {
-        logger.error("Error reading the binary file:", err.message);
-        return;
-      }
+    try {
+      const data = await fs.promises.readFile(inputFileName);
 
       const hashGameCode = this.formatHash(await this.getHashByGameIDOrAlt(originalname, originalname));
-
       const patches = PatchService.extractPatches(data);
       let cmdCount = 0;
       let netEmuToPnach = [];
       let outputLines = [`Extracted Patches: ${originalname} ---- Hash:  ${hashGameCode}\n\n`];
 
-
-
       patches.forEach((occurrence, index) => {
         outputLines.push(`${occurrence.occurrence}:\n\n`);
-
         occurrence.patches.forEach((patch, patchIndex) => {
           cmdCount++;
           if (cmdCount > 31) {
@@ -273,20 +265,14 @@ class PatchService {
       let outputContent = outputLines.join('');
       let outputFilePathText = path.resolve(__dirname, '/tmp/', originalname) + ".txt";
 
-      // fs.writeFile(outputFilePathText, outputContent, 'latin1', (writeErr) => {
-      //   if (writeErr) {
-      //     logger.error("Error saving the file:", writeErr.message);
-      //     return;
-      //   }
-      //   logger.log(`Extracted patches saved to: ${outputFileName}`);
-      // });
-
       runPs2ConfigCmd();
       const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
-
       return zipFile;
 
-    });
+    } catch (err) {
+      logger.error("Error reading the binary file:", err.message);
+      throw err;
+    }
   }
 
 

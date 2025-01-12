@@ -1,5 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
+const SimpleLogger = require('../utils/simple-logger');
+const logger = new SimpleLogger('/tmp/log-file.log');
 const PatchService = require('../services/patch-service');
 
 const PatchController = {
@@ -57,11 +59,8 @@ const PatchController = {
   },
 
   async generateJsonResponse(req, res) {
-
     const filePath = req.file.path;
     const name = req.file.originalname;
-
-    const originalName = `${name}`.replace('.CONFIG', '');
 
     if (!name) {
       return res.status(400).json({ error: 'File name is required' });
@@ -72,7 +71,7 @@ const PatchController = {
       const json = await PatchService.returnJsonOfConfigs(filePath, originalName);
       return res.status(200).json(json);
     } catch (error) {
-      console.error('Error building JSON:', error.message);
+      logger.error('Error building JSON:', error.message);
       return res.status(500).json({ error: 'Error building JSON' });
     }
   },
@@ -88,21 +87,18 @@ const PatchController = {
 
     const filePath = req.file.path;
     const name = req.file.originalname;
+    const originalName = name.replace('.CONFIG', '');
 
-    const originalName = `${name}`.replace('.CONFIG', '');
-
-    console.log(`Processing hex file: ${originalName}`);
+    logger.log(`Processing hex file: ${originalName}`);
 
     try {
       await PatchService.processFile(filePath, originalName);
-
       return res.status(200).json({
         message: 'Hex file processing completed.',
         downloadLink: `/download/${originalName}.zip`
       });
-
     } catch (error) {
-      console.error('Error processing hex file:', error.message);
+      logger.error('Error processing hex file:', error.message);
       return res.status(500).json({ error: 'Error processing hex file' });
     }
   },
