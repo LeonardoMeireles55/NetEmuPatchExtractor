@@ -25,9 +25,6 @@ class PatchService {
   }
 
   static async getHashByGameIDOrAlt(gameID, altGameID) {
-    // const slicedGameID = gameID.slice(0, -7);
-    // const slicedAltGameID = altGameID.slice(0, -7);
-
     logger.log("Searching for hash in the database...");
     logger.log("Game ID:", gameID, "Alt Game ID:", altGameID);
 
@@ -76,23 +73,7 @@ class PatchService {
       patches.forEach((occurrence, index) => {
         occurrence.patches.forEach((patch) => {
           cmdCount++;
-          if (cmdCount > 31) return;
-
-          const bigEndianOffset = PatchService.toBigEndian(patch.offset);
-          const bigEndianOriginalOpcode = PatchService.toBigEndian(patch.originalOpcode);
-          const bigEndianReplaceOpcode = PatchService.toBigEndian(patch.replaceOpcode);
-          const patchData = {
-            LittleEndian: {
-              Offset: patch.offset,
-              OriginalOpcode: patch.originalOpcode,
-              ReplaceOpcode: patch.replaceOpcode
-            },
-            BigEndian: {
-              Offset: bigEndianOffset,
-              OriginalOpcode: bigEndianOriginalOpcode,
-              ReplaceOpcode: bigEndianReplaceOpcode
-            }
-          };
+          if (cmdCount > 16) return;
 
           jsonOcurrences.push({
             GameTitle: originalname,
