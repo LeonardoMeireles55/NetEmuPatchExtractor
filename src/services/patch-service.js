@@ -53,6 +53,8 @@ class PatchService {
 
     switch (cmd) {
 
+
+
       case 0x13: {
         const requiredBytes = offset + 12; // 4 (cmd) + 8 (uint64_t)
         if (requiredBytes > data.length) {
@@ -202,6 +204,30 @@ class PatchService {
         return { count: `0x${count.toString(16).toUpperCase().padStart(2, '0')}`, args: items };
       }
 
+      case 0x42: {
+        const address = data.readUInt32LE(offset + 4);
+        const count = data.readUInt32LE(offset + 8);
+        const opcodes = [];
+
+        for (let i = 0; i < count; i++) {
+          const opcodeOffset = offset + 12 + i * 4;
+          if (opcodeOffset + 4 > data.length) {
+            break;
+          }
+          const opcode = data.readUInt32LE(opcodeOffset);
+          opcodes.push(`0x${opcode.toString(16).toUpperCase().padStart(8, '0')}`);
+        }
+
+        return {
+          address: `0x${address.toString(16).toUpperCase().padStart(8, '0')}`,
+          opcodes
+        };
+      }
+
+      case 0x46: {
+        return { message: "Enable L2H Improvement" };
+      }
+
       default:
         return { empty: '-' };
     }
@@ -219,6 +245,10 @@ class PatchService {
     for (const cmd of commandList) {
       const positions = [];
       for (let i = 0; i < data.length - 3; i++) {
+        if (data[i] === 0x42 && data[i + 1] === 0x00 && data[i + 2] === 0x00 && data[i + 3] === 0x00) {
+          positions.push(i);
+        }
+
         if (
           data[i - 1] === 0x00 &&
           data[i] === cmd &&
