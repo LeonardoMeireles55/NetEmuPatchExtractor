@@ -54,6 +54,10 @@ class PatchService {
   }
 
   static parseParamsForCommand(cmd, data, offset) {
+    if (offset >= data.length) {
+      logger.error(`Invalid offset: "0x"${offset} for buffer length: "0x"${data.length}`);
+      return null;
+    }
 
     switch (cmd) {
 
@@ -144,14 +148,17 @@ class PatchService {
       case 0x0F: {
         const items = [];
         const offsetPatch = offset + 4;
+
         for (let i = 0; i < data.length; i += 4) {
           const entryOffset = offsetPatch + i;
-          if (data[entryOffset + 4] && data[entryOffset + 8] == 0) {
+
+          if (entryOffset + 8 > data.length) {
+            logger.error(`Entry offset out of range: ${entryOffset + 8} for buffer length: ${data.length}`);
             break;
           }
+
           const param1 = data.readUInt32LE(entryOffset);
           const param2 = data.readUInt32LE(entryOffset + 4);
-
 
           items.push(
             `0x${param1.toString(16).toUpperCase().padStart(8, '0')}`,
@@ -161,7 +168,6 @@ class PatchService {
 
         return { args: items };
       }
-
       case 0x26: {
         const count = data.readUInt32LE(offset + 4);
         const limitedCount = Math.min(count, 32);
@@ -567,33 +573,50 @@ class PatchService {
 
 
   static async processFile(inputFileName, originalname) {
-    const configName = originalname.replace('.CONFIG', '');
-    const outputFilePath = path.resolve(__dirname, '/tmp', configName);
+    const tmpDir = '/tmp';
+    const configName = originalname;
+    const outputFilePath = path.join(tmpDir, configName);
 
     try {
       const data = await fs.promises.readFile(inputFileName);
+
+      // Add validation for data buffer
+      if (!Buffer.isBuffer(data)) {
+        throw new Error('Invalid data format');
+      }
+
+      logger.log(`File size: ${data.length} bytes`);
+
+      // Validate data before processing
+      if (data.length === 0) {
+        throw new Error('Empty file');
+      }
+
       const hashName = await this.getHashByGameIDOrAlt(configName, configName);
-
       const hashGameCode = `${this.formatHash(hashName.hash)} --- ${hashName.name}`;
-      const patches = PatchService.findAllCommandLocalizations(data);
 
-      let outputLines = [`Extracted Patches: ${originalname} ---- Hash:  ${hashGameCode}\n\n`];
+      // Add debugging for patches extraction
+      logger.log('Starting patch extraction...');
+      const patches = PatchService.findAllCommandLocalizations(data);
+      logger.log('Patches extracted successfully');
+
+      let outputLines = [`Extracted Patches: ${originalname} ---- Hash: ${hashGameCode}\n\n`];
       outputLines.push(JSON.stringify(patches, null, 2));
 
       const outputContent = outputLines.join('');
-      const outputFilePathText = path.resolve(__dirname, '/tmp', `${originalname}.txt`);
+      const outputFilePathText = path.join(tmpDir, `${originalname}.txt`);
 
-      runPs2ConfigCmd();
+      await runPs2ConfigCmd();
 
       const zipFile = await this.saveAndZipFiles(outputFilePath, outputFilePathText, outputContent);
       return zipFile;
 
     } catch (err) {
       logger.error("Error processing the file:", err.message);
+      logger.error("Stack trace:", err.stack);
       throw err;
     }
   }
-
   static async deleteOldFiles() {
     const outputDirectory = path.resolve(__dirname, '/tmp/configs');
     try {
