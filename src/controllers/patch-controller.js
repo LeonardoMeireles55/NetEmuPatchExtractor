@@ -4,13 +4,16 @@ const SimpleLogger = require('../utils/simple-logger');
 const logger = new SimpleLogger('/tmp/log-file.log');
 const PatchService = require('../services/patch-service');
 
+// Extracted constant for special character pattern
+const SPECIAL_CHAR_PATTERN = /[^\w._]/;
+
 const PatchController = {
 
   async getFileFromTmp(req, res) {
     const fileName = req.params.fileName;
 
     if (!fileName) {
-      return res.status(400).json({ error: 'File name not provided' });
+      return res.status(400).json('File name not provided');
     }
 
     const tmpFilePath = path.join('/tmp', fileName);
@@ -44,10 +47,10 @@ const PatchController = {
         return res.status(400).json({ error: 'File is not ready' });
       }
 
-      console.log('Sending file:', tmpFilePath);
+      logger.log('Sending file:', tmpFilePath);
       return res.download(tmpFilePath, fileName, (err) => {
         if (err) {
-          console.error('Error sending file:', err);
+          logger.error('Error sending file:', err);
           return res.status(500).json({ error: 'Error sending file' });
         }
       });
@@ -66,19 +69,27 @@ const PatchController = {
       return res.status(400).json({ error: 'File name is required' });
     }
 
+    if (SPECIAL_CHAR_PATTERN.test(req.file.originalname)) {
+      return res.status(400).json('File name contains invalid characters as (), [], {}, etc.');
+    }
+
     try {
       const originalName = name.replace('.CONFIG', '');
       const json = await PatchService.returnJsonOfConfigs(filePath, originalName);
       return res.status(200).json(json);
     } catch (error) {
       logger.error('Error building JSON:', error.message);
-      return res.status(500).json({ error: 'Error building JSON' });
+      return res.status(500).json('Error building JSON');
     }
   },
 
   async processHexFile(req, res) {
     if (!req.file) {
       return res.status(400).json({ error: 'Hex file is required' });
+    }
+
+    if (SPECIAL_CHAR_PATTERN.test(req.file.originalname)) {
+      return res.status(400).json('File name contains invalid characters as (), [], {}, etc.');
     }
 
     if (!req.file.originalname.endsWith('.CONFIG')) {
@@ -99,7 +110,7 @@ const PatchController = {
       });
     } catch (error) {
       logger.error('Error processing hex file:', error.message);
-      return res.status(500).json({ error: 'Error processing hex file' });
+      return res.status(500).json('Error processing hex file');
     }
   },
 };

@@ -4,6 +4,7 @@ const path = require('path');
 class SimpleLogger {
   constructor(logFilePath) {
     this.logFilePath = logFilePath || path.resolve(__dirname, 'application.log');
+    this.logLevel = process.env.LOG_LEVEL || 'LOG';
     this.stream = this._createWriteStream(this.logFilePath);
   }
 
@@ -24,6 +25,10 @@ class SimpleLogger {
   }
 
   _createWriteStream(logFilePath) {
+    const logDir = path.dirname(logFilePath);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
     return fs.createWriteStream(logFilePath, { flags: 'a', encoding: 'utf8' });
   }
 
@@ -37,6 +42,11 @@ class SimpleLogger {
   }
 
   _writeToLog(level, message, ...optionalParams) {
+    const levels = { 'ERROR': 0, 'WARN': 1, 'INFO': 2, 'LOG': 3 };
+    if (levels[level] > levels[this.logLevel.toUpperCase()]) {
+      return;
+    }
+
     const formattedMessage = this._formatLogMessage(level, message, ...optionalParams);
 
     if (level === 'ERROR') {

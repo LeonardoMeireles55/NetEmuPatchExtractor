@@ -6,6 +6,10 @@ const logger = new SimpleLogger('/tmp/log-file.log');
 const { findHashByGameID, findNameHashByGameID } = require('../database/sqlite3-db.js');
 const { runPs2ConfigCmd } = require('../utils/ps2-config');
 
+// Define constants for magic numbers and timeout durations
+const MAX_PATCH_COUNT = 31;
+const FILE_SYSTEM_DELAY_MS = 1000;
+
 class PatchService {
 
   static formatHash(input) {
@@ -30,12 +34,12 @@ class PatchService {
 
     const hash = await findHashByGameID(gameID, altGameID);
     if (!hash) {
-      new Error("Game not found in the database");
+      throw new Error("Game not found in the database");
     }
 
     const name = await findNameHashByGameID(gameID, altGameID);
     if (!name) {
-      new Error("Game not found in the database");
+      throw new Error("Game name not found in the database");
     }
 
     return { hash, name };
@@ -53,13 +57,6 @@ class PatchService {
 
     switch (cmd) {
 
-      case 0x3D: {
-        const revision = data.readUInt32LE(offset + 4);
-        return {
-          revision: `0x${revision.toString(16).toUpperCase().padStart(8, '0')}`,
-          description: 'Config Revision'
-        };
-      }
 
       case 0x13: {
         const requiredBytes = offset + 12;
@@ -516,7 +513,7 @@ class PatchService {
   static async saveAndZipFiles(originalOutputFilePath, outputFilePathText, outputContent) {
     try {
       // Check and delete existing zip if present
-      const zipPath = originalOutputFilePath + '.zip';
+      const zipPath = `${originalOutputFilePath}.zip`;
       try {
         await fs.promises.access(zipPath);
         await fs.promises.unlink(zipPath);
@@ -530,19 +527,14 @@ class PatchService {
       logger.log(`Text file saved: ${outputFilePathText}`);
 
       // Delay for file system sync
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, FILE_SYSTEM_DELAY_MS));
 
-      // Check if both files exist
-      const hexExists = await fs.promises.access(originalOutputFilePath)
-        .then(() => true)
-        .catch(() => false);
-
-      const textExists = await fs.promises.access(outputFilePathText)
-        .then(() => true)
-        .catch(() => false);
-
-      if (!textExists || !hexExists) {
-        throw new Error('One or more files missing before zip creation');
+      try {
+        await fs.promises.access(originalOutputFilePath);
+        await fs.promises.access(outputFilePathText);
+      } catch (error) {
+        logger.error('Error checking for files:', error);
+        throw new Error('One or more files are missing before zip creation');
       }
 
       // Create zip
@@ -582,14 +574,14 @@ class PatchService {
       const data = await fs.promises.readFile(inputFileName);
       const hashName = await this.getHashByGameIDOrAlt(configName, configName);
 
-      const hashGameCode = this.formatHash(hashName.hash) + ' --- ' + hashName.name;
+      const hashGameCode = `${this.formatHash(hashName.hash)} --- ${hashName.name}`;
       const patches = PatchService.findAllCommandLocalizations(data);
 
       let outputLines = [`Extracted Patches: ${originalname} ---- Hash:  ${hashGameCode}\n\n`];
       outputLines.push(JSON.stringify(patches, null, 2));
 
-      let outputContent = outputLines.join('');
-      let outputFilePathText = path.resolve(__dirname, '/tmp/', originalname) + ".txt";
+      const outputContent = outputLines.join('');
+      const outputFilePathText = path.resolve(__dirname, '/tmp', `${originalname}.txt`);
 
       runPs2ConfigCmd();
 
@@ -597,34 +589,30 @@ class PatchService {
       return zipFile;
 
     } catch (err) {
-      logger.error("Error reading the binary file:", err.message);
+      logger.error("Error processing the file:", err.message);
       throw err;
     }
   }
 
-
-  static deleteOldFiles() {
-    const outputDirectory = path.resolve(__dirname, '/tmp');
-    fs.readdir(outputDirectory, (err, files) => {
-      if (err) {
-        logger.error("Error reading the output directory:", err.message);
-        return;
-      }
-      files.forEach((file) => {
+  static async deleteOldFiles() {
+    const outputDirectory = path.resolve(__dirname, '/tmp/configs');
+    try {
+      const files = await fs.promises.readdir(outputDirectory);
+      for (const file of files) {
         if (file === 'log-file.log' || file === 'games.db') {
-          return;
+          continue;
         }
         const filePath = path.resolve(outputDirectory, file);
-        fs.unlink(filePath, (unlinkErr) => {
-          if (unlinkErr) {
-            logger.error("Error deleting the file:", unlinkErr.message);
-            return;
-          }
+        try {
+          await fs.promises.unlink(filePath);
           logger.log(`Deleted file: ${file}`);
-        });
-      });
-    });
+        } catch (unlinkErr) {
+          logger.error("Error deleting the file:", unlinkErr.message);
+        }
+      }
+    } catch (err) {
+      logger.error("Error reading the output directory:", err.message);
+    }
   }
-
 }
 module.exports = PatchService;

@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const extractButton = document.getElementById('btn');
     const downloadLink = document.getElementById('downloadLink');
     const originalText = downloadLink ? downloadLink.textContent : '';
+    const loadingOverlay = document.getElementById('loadingOverlay');
 
     if (downloadLink) {
         downloadLink.innerHTML = `
@@ -46,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
         downloadLink.addEventListener('click', function (e) {
             if (this.getAttribute('href') !== '#') {
                 this.classList.add('loading-button');
+                this.setAttribute('aria-busy', 'true');
                 this.disabled = true;
 
                 const icon = this.querySelector('.download-icon');
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 setTimeout(() => {
                     this.classList.remove('loading-button');
+                    this.removeAttribute('aria-busy');
                     this.disabled = false;
                     if (icon) {
                         icon.classList.remove('spin');
@@ -64,86 +67,96 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    document.getElementById('fileForm').addEventListener('submit', async function (event) {
-        event.preventDefault();
+    const fileForm = document.getElementById('fileForm');
+    if (fileForm) {
+        fileForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
 
-        const fileInput = document.getElementById('fileInput');
-        const logOutput = document.getElementById('logOutput');
-        const downloadSection = document.getElementById('downloadSection');
+            // Show loading overlay
+            loadingOverlay.classList.remove('hidden');
 
-        const file = fileInput.files[0];
-        if (!file) {
-            alert('Please select a file.');
-            return;
-        }
+            const fileInput = document.getElementById('fileInput');
+            const logOutput = document.getElementById('logOutput');
+            const downloadSection = document.getElementById('downloadSection');
 
-        const formData = new FormData();
-        formData.append('file', file);
-
-        logOutput.textContent = 'Starting processing...';
-        downloadSection.classList.add('hidden');
-
-        try {
-            if (extractButton) {
-                extractButton.disabled = true;
-                extractButton.classList.add('loading');
-                extractButton.textContent = 'Processing...';
+            const file = fileInput ? fileInput.files[0] : null;
+            if (!file) {
+                alert('Please select a file.');
+                // Hide loading overlay
+                loadingOverlay.classList.add('hidden');
+                return;
             }
 
+            const formData = new FormData();
+            formData.append('file', file);
 
-            const response = await fetch('../process-hex', {
-                method: 'POST',
-                body: formData
-            });
+            logOutput.textContent = 'Starting processing...';
+            downloadSection.classList.add('hidden');
 
-            if (!response.ok) {
-                throw new Error(`Error: Status ${response.status} - ${response.statusText}`);
-            }
+            try {
+                if (extractButton) {
+                    extractButton.disabled = true;
+                    extractButton.classList.add('loading');
+                    extractButton.textContent = 'Processing...';
+                }
 
-            const data = await response.json();
-            if (data.error) {
-                throw new Error(data.error);
-            }
+                const response = await fetch('../process-hex', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            const jsonConfigResponse = await fetch('../process-hex-json', {
-                method: 'POST',
-                body: formData
-            });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Status ${response.status} - ${response.statusText} - ${errorText}`);
+                }
 
-            if (!jsonConfigResponse.ok) {
-                throw new Error(`Error: Status ${jsonConfigResponse.status} - ${jsonConfigResponse.statusText}`);
-            }
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
 
-            const jsonConfigs = await jsonConfigResponse.json();
+                const jsonConfigResponse = await fetch('../process-hex-json', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            setTimeout(() => {
-                logOutput.textContent = `Success: ${data.message}\n GameID:${jsonConfigs.gameID}\n Configs: ${JSON.stringify(jsonConfigs.patches, null, 2)}`;
+                if (!jsonConfigResponse.ok) {
+                    throw new Error(`Error: Status ${jsonConfigResponse.status} - ${jsonConfigResponse.statusText}`);
+                }
 
-            }, 1000);
+                const jsonConfigs = await jsonConfigResponse.json();
 
+                setTimeout(() => {
+                    logOutput.textContent = `Success: ${data.message}\n GameID:${jsonConfigs.gameID}\n Configs: ${JSON.stringify(jsonConfigs.patches, null, 2)}`;
+                }, 1000);
 
-            if (downloadLink) {
-                downloadLink.href = data.downloadLink;
-            }
+                if (downloadLink) {
+                    downloadLink.href = data.downloadLink;
+                }
 
-            setTimeout(() => {
-                downloadSection.classList.remove('hidden');
+                setTimeout(() => {
+                    downloadSection.classList.remove('hidden');
+                    if (extractButton) {
+                        extractButton.classList.remove('loading');
+                        extractButton.textContent = 'Extract';
+                        extractButton.disabled = false;
+                    }
+                    // Hide loading overlay
+                    loadingOverlay.classList.add('hidden');
+                }, 1000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                logOutput.textContent = `Error: ${error.message}`;
+                downloadSection.classList.add('hidden');
                 if (extractButton) {
                     extractButton.classList.remove('loading');
                     extractButton.textContent = 'Extract';
                     extractButton.disabled = false;
                 }
-            }, 1000);
-
-        } catch (error) {
-            console.error('Error:', error);
-            logOutput.textContent = `Error: ${error.message}`;
-            downloadSection.classList.add('hidden');
-            if (extractButton) {
-                extractButton.classList.remove('loading');
-                extractButton.textContent = 'Extract';
-                extractButton.disabled = false;
+                // Hide loading overlay
+                loadingOverlay.classList.add('hidden');
             }
-        }
-    });
+        });
+    }
 });
