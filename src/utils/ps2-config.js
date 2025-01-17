@@ -11,7 +11,7 @@ async function runPs2ConfigCmd() {
         const cwd = process.cwd();
         logger.log('Current working directory:', cwd);
 
-        const binPath = path.join(cwd, 'public', 'binary', 'ps2config-cmd');
+        const binPath = path.join(cwd, 'public', 'binary', 'bin-cmd');
         logger.log('Binary path:', binPath);
 
         const inputPath = '/tmp/configs';
